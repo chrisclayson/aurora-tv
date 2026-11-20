@@ -1,0 +1,16 @@
+*.wgt
+*.wgt.sig
+.DS_Store
+node_modules/
+build/
+config.local.json
+.manifest.tmp
+author-signature.xml
+signature*.xml
+config-server/data/*.tmp
+config-server/node_modules/
+
+# Personal deployment notes and live per-TV profiles. Never commit these.
+PRIVATE-NOTES.md
+config-server/data/*.json
+!config-server/data/example.json

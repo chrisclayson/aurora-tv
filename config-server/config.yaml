@@ -1,0 +1,26 @@
+name: Aurora TV Configuration
+version: "1.0.0"
+slug: aurora_config
+description: Central configuration UI and JSON API for Aurora TV launchers
+arch:
+  - aarch64
+  - amd64
+  - armv7
+startup: application
+boot: auto
+init: false
+ingress: true
+ingress_port: 8090
+panel_icon: mdi:television-guide
+panel_title: Aurora TV
+ports:
+  "8090/tcp": 8090
+ports_description:
+  "8090/tcp": Aurora configuration UI and TV API
+options:
+  config_token: ""
+  public_url: ""
+schema:
+  config_token: str?
+  public_url: str?
+watchdog: "http://[HOST]:[PORT:8090]/api/health"

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://aurora.local/app"
+        version="1.7.9"
+        viewmodes="maximized">
+  <tizen:application id="auroratv01.Aurora"
+                     package="auroratv01"
+                     required_version="5.5"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <icon src="icon.png"/>
+  <name>Aurora</name>
+  <description>Apple TV inspired launcher with HDMI, Live TV, guide, Home Assistant and remote configuration.</description>
+  <access origin="*" subdomains="true"/>
+  <tizen:setting screen-orientation="landscape"
+                 context-menu="disable"
+                 background-support="disable"
+                 encryption="disable"
+                 install-location="auto"
+                 hwkey-event="enable"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+  <tizen:privilege name="http://tizen.org/privilege/application.info"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.channel"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+  <tizen:privilege name="http://tizen.org/privilege/systeminfo"/>
+  <tizen:privilege name="http://tizen.org/privilege/system"/>
+</widget>

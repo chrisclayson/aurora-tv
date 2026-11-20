@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aurora · On-TV configuration</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23234bd8'/%3E%3Ctext x='16' y='23' font-family='Arial' font-size='20' font-weight='700' fill='white' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">A</span>
+      <div class="brand-text">
+        <strong>AURORA</strong>
+        <small>On-TV configuration</small>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="pill" id="dirty-pill" hidden><span class="dot warn"></span><span>Unsaved changes</span></span>
+      <span class="pill" id="server-pill"><span class="dot"></span><span id="server-text">Connecting…</span></span>
+      <button class="btn ghost small" id="token-btn" type="button">Access token</button>
+      
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-head">
+        <span>Devices</span>
+        
+      </div>
+      <div id="device-list" class="device-list"></div>
+      <div class="side-note">
+        Choose a TV, edit its settings, then save. Aurora polls this server; after
+        the first bootstrap, no rebuild or reinstall is needed.
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="editor-head">
+        <div class="editor-title">
+          <p class="eyebrow">DEVICE CONFIGURATION</p>
+          <h1 id="device-title">Loading…</h1>
+          <p class="meta" id="device-meta"></p>
+        </div>
+        <div class="head-actions">
+          
+          <button id="download-config" class="btn ghost small" type="button">Download config.json</button>
+          <button id="revert" class="btn ghost small" type="button">Revert</button>
+          <button id="save" class="btn primary" type="button">Save changes</button>
+        </div>
+      </div>
+
+      <div class="dirty" id="dirty" hidden>Unsaved changes</div>
+      <div class="banner error" id="error-banner" hidden></div>
+
+      <form id="form" autocomplete="off"></form>
+
+      <div class="empty" id="empty" hidden>
+        <h2>No devices yet</h2>
+        <p>Add a device to create its configuration.</p>
+        <button class="btn primary" id="empty-add" type="button">Add device</button>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-host" aria-live="polite"></div>
+
+  <div class="modal-backdrop" id="token-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="token-title">
+      <h2 id="token-title">Server access token</h2>
+      <p class="modal-copy">
+        This configuration server is protected by <code>AURORA_CONFIG_TOKEN</code>.
+        Enter the token to read and write TV configurations. It is kept in this
+        browser tab only.
+      </p>
+      <label class="field">
+        <span>Token</span>
+        <input id="token-input" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the token">
+      </label>
+      <p class="form-error" id="token-error" hidden></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="token-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="token-save" type="button">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="device-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-device-title">
+      <h2 id="new-device-title">Add a device</h2>
+      <p class="modal-copy">Create a new TV profile. It starts as a copy of an existing profile.</p>
+      <div class="modal-grid">
+        <label class="field">
+          <span>Device ID</span>
+          <input id="new-id" type="text" placeholder="living-room" autocomplete="off" spellcheck="false">
+          <small>Lowercase letters, numbers, hyphen and underscore. Use the same ID in each TV's remote config URL.</small>
+        </label>
+        <label class="field">
+          <span>Name</span>
+          <input id="new-name" type="text" placeholder="Living Room" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Model</span>
+          <input id="new-model" type="text" placeholder="QE50QN90CATXXU" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Copy from</span>
+          <select id="new-copy"></select>
+        </label>
+      </div>
+      <p class="form-error" id="new-error" hidden></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="new-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="new-save" type="button">Create device</button>
+      </div>
+    </div>
+  </div>
+
+  <script>window.AURORA_LOCAL_SERVER = true;</script>
+  <script src="app.js"></script>
+</body>
+</html>

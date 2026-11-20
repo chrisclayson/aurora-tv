@@ -1,0 +1,17 @@
+[Unit]
+Description=Aurora TV remote configuration server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/aurora-config
+ExecStart=/usr/bin/node /opt/aurora-config/server.js
+Restart=always
+RestartSec=5
+Environment=PORT=8090
+# Environment=AURORA_CONFIG_TOKEN=change-me
+# Environment=AURORA_PUBLIC_URL=http://<HA-IP>:8090
+
+[Install]
+WantedBy=multi-user.target

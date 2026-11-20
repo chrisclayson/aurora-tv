@@ -1,0 +1,49 @@
+{
+  "deviceId": "example-tv",
+  "deviceName": "Example TV",
+  "model": "QE32LS03TCUXXH",
+  "sources": {
+    "hdmi1": {
+      "label": "HDMI 1",
+      "sub": "Mac mini",
+      "appId": "",
+      "haSource": "HDMI1"
+    },
+    "hdmi2": {
+      "label": "HDMI 2",
+      "sub": "Spare input",
+      "appId": "",
+      "haSource": "HDMI2"
+    },
+    "hdmi3": {
+      "label": "HDMI 3",
+      "sub": "Spare input",
+      "appId": "",
+      "haSource": "HDMI3"
+    },
+    "hdmi4": {
+      "label": "HDMI 4",
+      "sub": "Spare input",
+      "appId": "",
+      "haSource": "HDMI4"
+    },
+    "livetv": {
+      "label": "Live TV",
+      "sub": "Aerial",
+      "appId": "org.tizen.tv-viewer",
+      "haSource": "TV"
+    }
+  },
+  "ui": {
+    "lastExternal": "hdmi1"
+  },
+  "remoteConfig": {
+    "enabled": false,
+    "url": "",
+    "token": "",
+    "pollMinutes": 5
+  },
+  "localServer": {
+    "enabled": true
+  }
+}

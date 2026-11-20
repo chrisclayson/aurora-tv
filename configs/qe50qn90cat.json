@@ -1,0 +1,49 @@
+{
+  "deviceId": "example-tv",
+  "deviceName": "Example TV",
+  "model": "QE50QN90CATXXU",
+  "sources": {
+    "hdmi1": {
+      "label": "HDMI 1",
+      "sub": "Apple TV",
+      "appId": "",
+      "haSource": "HDMI1"
+    },
+    "hdmi2": {
+      "label": "HDMI 2",
+      "sub": "PlayStation 5",
+      "appId": "",
+      "haSource": "HDMI2"
+    },
+    "hdmi3": {
+      "label": "HDMI 3",
+      "sub": "Switch",
+      "appId": "",
+      "haSource": "HDMI3"
+    },
+    "hdmi4": {
+      "label": "HDMI 4",
+      "sub": "Spare input",
+      "appId": "",
+      "haSource": "HDMI4"
+    },
+    "livetv": {
+      "label": "Live TV",
+      "sub": "Aerial",
+      "appId": "org.tizen.tv-viewer",
+      "haSource": "TV"
+    }
+  },
+  "ui": {
+    "lastExternal": "hdmi2"
+  },
+  "remoteConfig": {
+    "enabled": false,
+    "url": "",
+    "token": "",
+    "pollMinutes": 5
+  },
+  "localServer": {
+    "enabled": true
+  }
+}

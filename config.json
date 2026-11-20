@@ -1,0 +1,79 @@
+{
+  "deviceId": "living-room",
+  "deviceName": "Living Room",
+  "model": "",
+  "ha": {
+    "enabled": false,
+    "baseUrl": "",
+    "token": "",
+    "tvEntity": "",
+    "lightEntity": "",
+    "powerEntity": "",
+    "pages": [
+      {
+        "id": "home",
+        "name": "Home",
+        "widgets": []
+      }
+    ],
+    "currentPage": "home",
+    "musicEntity": ""
+  },
+  "epg": {
+    "xmltvUrl": "",
+    "demo": true,
+    "refreshMinutes": 60,
+    "horizonHours": 3
+  },
+  "sources": {
+    "hdmi1": {
+      "label": "HDMI 1",
+      "sub": "Apple TV",
+      "appId": "",
+      "haSource": "HDMI1"
+    },
+    "hdmi2": {
+      "label": "HDMI 2",
+      "sub": "Games console",
+      "appId": "",
+      "haSource": "HDMI2"
+    },
+    "hdmi3": {
+      "label": "HDMI 3",
+      "sub": "Media PC",
+      "appId": "",
+      "haSource": "HDMI3"
+    },
+    "hdmi4": {
+      "label": "HDMI 4",
+      "sub": "Spare input",
+      "appId": "",
+      "haSource": "HDMI4"
+    },
+    "livetv": {
+      "label": "Live TV",
+      "sub": "Antenna / cable",
+      "appId": "org.tizen.tv-viewer",
+      "haSource": "TV"
+    }
+  },
+  "livetv": {
+    "guideAppId": "",
+    "defaultChannel": ""
+  },
+  "ui": {
+    "lastExternal": "livetv",
+    "dashboardDuration": 30,
+    "overlayTimeoutMs": 3500
+  },
+  "remoteConfig": {
+    "enabled": false,
+    "url": "",
+    "token": "",
+    "pollMinutes": 5
+  },
+  "localServer": {
+    "enabled": true,
+    "token": ""
+  }
+}

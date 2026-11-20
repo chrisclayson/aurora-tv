@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src *; connect-src * ws: wss: http: https:; frame-src 'self' http: https:; font-src 'self' data:">
+  <title>Aurora</title>
+  <link rel="stylesheet" href="css/app.css?v=20261117">
+</head>
+<body data-screen="home">
+
+  <div id="backdrop" aria-hidden="true">
+    <span class="grain"></span>
+  </div>
+
+  <section id="screen-home" class="screen home active" aria-label="Aurora home">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">A</span>
+        <span class="brand-name">AURORA</span>
+      </div>
+      <div class="topbar-right">
+        <div class="statuses">
+          <span class="status" id="status-ha" title="Home Assistant">
+            <span class="status-dot"></span><span class="status-label">HA</span>
+          </span>
+        </div>
+        <button class="icon-btn" id="btn-settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.1"></circle>
+            <path d="M19.4 14.2a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06A2 2 0 1 1 3.14 15.9l.06-.06a1.7 1.7 0 0 0 .34-1.87A1.7 1.7 0 0 0 2 12.94H2a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 1 1 6.1 3.14l.06.06a1.7 1.7 0 0 0 1.87.34H8.1A1.7 1.7 0 0 0 9.13 2V2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06A2 2 0 1 1 18.9 6.1l-.06.06a1.7 1.7 0 0 0-.34 1.87v.04A1.7 1.7 0 0 0 20 9.13h.04a2 2 0 1 1 0 4H20a1.7 1.7 0 0 0-1.56 1.07Z"></path>
+          </svg>
+        </button>
+        <div class="clock">
+          <span id="clock-time">20:41</span>
+          <span id="clock-date">Saturday, 14 November</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="home-main">
+      <div class="hero-row">
+        <div class="hero">
+          <p class="eyebrow" id="home-date">SATURDAY, 14 NOVEMBER</p>
+          <h1 id="home-title">Good evening.</h1>
+          <p class="hero-sub" id="home-sub">Living Room</p>
+        </div>
+      </div>
+      <div class="rail-wrap">
+        <div class="rail" id="tile-rail" role="list"></div>
+      </div>
+    </main>
+
+    <div class="home-bottom">
+      <div class="sensor-strip" id="sensor-strip"></div>
+      <div class="hints">
+        <span class="hint"><span class="keycap">←</span><span class="keycap">→</span> Navigate</span>
+        <span class="hint"><span class="keycap ok">OK</span> Select</span>
+        <span class="hint"><span class="keycap">⚙</span> Settings</span>
+        <span class="hint"><span class="keycap">↩</span> Exit</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-guide" class="screen guide" aria-label="TV guide">
+    <div class="live-frame guide-live" id="guide-live" aria-label="Live input preview">
+      <div class="live-head">
+        <span class="live-dot"></span>
+        <span class="live-kicker">LIVE</span>
+        <span class="live-source" id="guide-live-source">Live TV</span>
+      </div>
+      <div class="live-screen">
+        <div class="live-video" id="guide-live-video"></div>
+        <div class="live-fallback">
+          <svg class="live-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5.5" width="18" height="12" rx="2.2"></rect>
+            <path d="M8.5 21h7M12 17.5V21"></path>
+          </svg>
+          <span class="live-fallback-title">Live preview</span>
+          <span class="live-fallback-sub" id="guide-live-fallback-sub">Live TV</span>
+        </div>
+      </div>
+    </div>
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow" id="guide-date">SATURDAY, 14 NOVEMBER</p>
+        <h1>TV Guide</h1>
+      </div>
+      <div class="guide-head-right">
+        <span class="guide-badge" id="guide-source">DEMO</span>
+        <span class="guide-window" id="guide-window"></span>
+      </div>
+    </header>
+
+    <div class="guide-error" id="guide-error" hidden></div>
+
+    <div class="guide-body">
+      <div class="guide-ruler">
+        <div class="guide-ruler-spacer"></div>
+        <div class="guide-ruler-track" id="guide-ruler-track"></div>
+      </div>
+      <div class="guide-scroll">
+        <div class="guide-rows" id="guide-rows"></div>
+      </div>
+    </div>
+
+    <footer class="guide-detail" id="guide-detail"></footer>
+  </section>
+
+  <section id="screen-ha" class="screen ha-native" aria-label="Home Assistant">
+    <header class="sub-head ha-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT</p>
+        <h1 id="ha-title">Home</h1>
+      </div>
+      <div class="ha-conn" id="ha-conn">
+        <span class="status-dot"></span><span id="ha-conn-label">Connecting</span>
+      </div>
+    </header>
+
+    <div class="ha-tabs" id="ha-tabs" role="tablist"></div>
+
+    <div class="ha-grid-wrap">
+      <div class="ha-grid" id="ha-grid" role="list"></div>
+      <div class="ha-empty" id="ha-empty" hidden>
+        <span class="ha-empty-title">No widgets yet</span>
+        <span class="ha-empty-sub">Press OK on “Add entities” to choose entities from Home Assistant.</span>
+      </div>
+    </div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span><span class="keycap">←</span><span class="keycap">→</span> Navigate</span>
+      <span><span class="keycap ok">OK</span> Toggle</span>
+      <span><span class="keycap">CH</span> Page</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-ha-browser" class="screen ha-browser" aria-label="Add Home Assistant entities">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT · <span id="ha-browser-page">Home</span></p>
+        <h1>Add entities</h1>
+      </div>
+      <div class="ha-browser-status" id="ha-browser-status"></div>
+    </header>
+
+    <div class="ha-browser-body">
+      <section class="ha-pane ha-area-pane">
+        <div class="ha-pane-head">AREAS</div>
+        <div class="ha-area-list" id="ha-area-list"></div>
+      </section>
+      <section class="ha-pane ha-entity-pane">
+        <div class="ha-pane-head" id="ha-entity-heading">SELECT AN AREA</div>
+        <div class="ha-entity-list" id="ha-entity-list"></div>
+      </section>
+    </div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap">←</span><span class="keycap">→</span> Areas / Entities</span>
+      <span><span class="keycap ok">OK</span> Add / Remove</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-ha-pages" class="screen ha-pages" aria-label="Home Assistant pages">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT</p>
+        <h1>Pages</h1>
+      </div>
+      <div class="ha-browser-status">Named collections of widgets</div>
+    </header>
+
+    <div class="ha-pages-wrap">
+      <div class="ha-pages-list" id="ha-pages-list"></div>
+    </div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap ok">OK</span> Open / New page</span>
+      <span><span class="keycap red">●</span> Rename</span>
+      <span><span class="keycap blue">●</span> Delete</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-music" class="screen music" aria-label="Music">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT · <span id="music-player-name">Music</span></p>
+        <h1 id="music-title">Music</h1>
+      </div>
+      <div class="ha-conn" id="music-conn">
+        <span class="status-dot"></span><span id="music-conn-label">Connecting</span>
+      </div>
+    </header>
+
+    <div class="music-body">
+      <div class="music-art-wrap">
+        <img id="music-art" class="music-art" alt="">
+        <div class="music-art-fallback" id="music-art-fallback">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 18V5l10-2v13"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="16.5" cy="16" r="2.5"></circle>
+          </svg>
+        </div>
+      </div>
+      <div class="music-meta">
+        <span class="music-state" id="music-state">Idle</span>
+        <h2 id="music-track">Nothing playing</h2>
+        <p class="music-artist" id="music-artist"></p>
+        <p class="music-album" id="music-album"></p>
+        <div class="music-progress"><div class="music-progress-fill" id="music-progress-fill"></div></div>
+        <div class="music-times"><span id="music-position">0:00</span><span id="music-duration">0:00</span></div>
+      </div>
+    </div>
+
+    <div class="music-controls" id="music-controls">
+      <button type="button" class="music-control" data-music-control="previous" aria-label="Previous track">
+        <span class="music-control-ico">⏮</span><span>Previous</span>
+      </button>
+      <button type="button" class="music-control primary" data-music-control="playpause" aria-label="Play or pause">
+        <span class="music-control-ico" id="music-play-icon">▶</span><span id="music-play-label">Play</span>
+      </button>
+      <button type="button" class="music-control" data-music-control="next" aria-label="Next track">
+        <span class="music-control-ico">⏭</span><span>Next</span>
+      </button>
+      <button type="button" class="music-control browse" data-music-control="browse" aria-label="Browse Music Assistant playlists">
+        <span class="music-control-ico">☰</span><span>Browse Music Assistant</span>
+      </button>
+    </div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">←</span><span class="keycap">→</span> Controls</span>
+      <span><span class="keycap ok">OK</span> Select</span>
+      <span><span class="keycap">CH</span> Track</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-music-browse" class="screen music-browse" aria-label="Music Assistant">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">MUSIC ASSISTANT</p>
+        <h1 id="music-browse-title">Browse</h1>
+      </div>
+      <div class="ha-browser-status" id="music-browse-status"></div>
+    </header>
+
+    <div class="music-browse-wrap">
+      <div class="music-browse-list" id="music-browse-list"></div>
+      <div class="ha-empty" id="music-browse-empty" hidden>
+        <span class="ha-empty-title">No items</span>
+        <span class="ha-empty-sub">Music Assistant did not return anything here.</span>
+      </div>
+    </div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap ok">OK</span> Open / Play</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-cameras" class="screen cameras" aria-label="Cameras">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT</p>
+        <h1>Cameras</h1>
+      </div>
+      <div class="ha-conn" id="camera-conn">
+        <span class="status-dot"></span><span id="camera-conn-label">Connecting</span>
+      </div>
+    </header>
+
+    <div class="camera-grid" id="camera-list"></div>
+    <div class="ha-empty" id="camera-empty" hidden>
+      <span class="ha-empty-title">No live cameras found</span>
+      <span class="ha-empty-sub">Cameras need streaming support, or an RTSP/HLS URL attribute.</span>
+    </div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span><span class="keycap">←</span><span class="keycap">→</span> Navigate</span>
+      <span><span class="keycap ok">OK</span> Live view</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-camera-live" class="screen camera-live" aria-label="Camera live view">
+    <object id="camera-player" type="application/avplayer" class="camera-player"></object>
+    <div class="camera-live-ui">
+      <div class="camera-live-top">
+        <span class="live-dot"></span>
+        <span id="camera-live-name">Camera</span>
+        <span class="camera-live-hint"><span class="keycap">CH</span> Change · <span class="keycap">↩</span> List</span>
+      </div>
+      <div class="camera-live-error" id="camera-live-error" hidden></div>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen settings" aria-label="Settings">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">SYSTEM</p>
+        <h1>Settings</h1>
+      </div>
+      <div class="settings-status" id="settings-saved"></div>
+    </header>
+    <div class="settings-scroll">
+      <div class="settings-list" id="settings-list"></div>
+    </div>
+    <footer class="settings-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Navigate</span>
+      <span><span class="keycap ok">OK</span> Edit</span>
+      <span><span class="keycap">↩</span> Discard &amp; close</span>
+    </footer>
+  </section>
+
+  <section id="screen-editor" class="screen editor" aria-label="Edit setting">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow" id="editor-eyebrow">EDIT</p>
+        <h1 id="editor-title">Setting</h1>
+      </div>
+      <div class="editor-hint" id="editor-hint"></div>
+    </header>
+    <div class="editor-body">
+      <label class="editor-label" id="editor-label"></label>
+      <input id="editor-input" class="editor-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="editor-help">Press Back to close the TV keyboard and select Cancel; Left/Right moves between Cancel and Save, Up returns to the text field, and OK activates the focused button.</p>
+    </div>
+    <div class="editor-actions">
+      <button type="button" class="btn ghost" id="editor-cancel">Cancel</button>
+      <button type="button" class="btn primary" id="editor-save">Save</button>
+    </div>
+  </section>
+
+  <section id="screen-entity-picker" class="screen entity-picker" aria-label="Choose Home Assistant entity">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT</p>
+        <h1 id="picker-title">Choose entity</h1>
+      </div>
+      <div class="ha-browser-status" id="picker-status"></div>
+    </header>
+    <div class="entity-picker-wrap">
+      <div class="entity-picker-list" id="picker-list"></div>
+      <div class="ha-empty" id="picker-empty" hidden>
+        <span class="ha-empty-title">No matching entities</span>
+        <span class="ha-empty-sub">Check the Home Assistant connection or choose another entity type.</span>
+      </div>
+    </div>
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap ok">OK</span> Select</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <div id="setup-overlay" class="setup-overlay" hidden>
+    <div class="setup-card">
+      <div class="setup-qr" id="setup-qr"></div>
+      <div class="setup-copy">
+        <p class="eyebrow">FIRST-TIME SETUP</p>
+        <h2>Configure Aurora<br>from your phone</h2>
+        <p class="setup-sub">Scan the code with a phone or tablet on the same network. It opens this TV's configuration page with the access token already filled in.</p>
+        <p class="setup-url" id="setup-url"></p>
+        <div class="setup-token"><span>Access token</span><code id="setup-token"></code></div>
+        <p class="setup-hint">This appears once. You can show it again in Settings.</p>
+        <button class="btn primary" id="setup-close" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-host"></div>
+
+  <script>
+    /* Samsung Product API (B2B input control) is only available inside the
+       Tizen widget runtime, not in the desktop preview server. */
+    if (location.protocol === 'file:') {
+      document.write('<script src="$WEBAPIS/webapis/webapis.js"><\/script>');
+    }
+  </script>
+  <script src="js/seed.js?v=20261117"></script>
+  <script src="js/qrcode.js?v=20261117"></script>
+  <script src="js/util.js?v=20261117"></script>
+  <script src="js/config.js?v=20261117"></script>
+  <script src="js/platform.js?v=20261117"></script>
+  <script src="js/ha.js?v=20261117"></script>
+  <script src="js/localserver.js?v=20261117"></script>
+  <script src="js/epg.js?v=20261117"></script>
+  <script src="js/ui.js?v=20261117"></script>
+  <script src="js/hanative.js?v=20261117"></script>
+  <script src="js/app.js?v=20261117"></script>
+</body>
+</html>

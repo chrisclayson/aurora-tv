@@ -1,0 +1,12 @@
+{
+  "name": "aurora-tv",
+  "version": "1.7.9",
+  "private": true,
+  "description": "Apple TV inspired Tizen launcher with HDMI, Live TV, XMLTV and Home Assistant",
+  "scripts": {
+    "serve": "python3 -m http.server 8080",
+    "icon": "python3 tools/make-icon.py",
+    "config": "node config-server/server.js"
+  },
+  "license": "MIT"
+}
