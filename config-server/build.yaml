@@ -1,0 +1,6 @@
+# Kept for compatibility with older Supervisor builders. Current Home Assistant
+# builds use the multi-arch Home Assistant base image directly in Dockerfile.
+build_from:
+  aarch64: ghcr.io/home-assistant/base:3.23
+  amd64: ghcr.io/home-assistant/base:3.23
+  armv7: ghcr.io/home-assistant/base:3.23

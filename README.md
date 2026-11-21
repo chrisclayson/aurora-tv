@@ -500,20 +500,27 @@ applies it live.
 
 ### Home Assistant add-on
 
-`config-server/` contains `config.yaml`, `Dockerfile` and `run.sh`, so it can be
-installed directly as a local add-on:
+The repository contains a root `repository.yaml` and the add-on in
+`config-server/`, so it can be added directly from GitHub:
 
-1. Copy `config-server/` to `/addons/aurora_config/` on the Home Assistant host
-   (Samba or SSH), keeping `config.yaml` at its root.
-2. Open **Settings → Add-ons → Add-on store**, refresh, install **Aurora TV
-   Configuration**.
-3. Set `config_token` (recommended) and `public_url` (for example
+1. Open **Settings → Add-ons → Add-on store → ⋮ → Repositories**.
+2. Add `https://github.com/chrisclayson/aurora-tv`.
+3. Install **Aurora TV Configuration** from the **Aurora TV** repository.
+4. Set `config_token` (recommended) and `public_url` (for example
    `http://homeassistant.local:8090`) in the add-on options. The EPG options
    `epg_region`, `epg_source_url`, `epg_lcn_url` and `epg_refresh_minutes`
    control the hourly UK Freeview guide. Then start it.
-4. Open the **Aurora TV** sidebar panel, or use
+5. Open the **Aurora TV** sidebar panel, or use
    `http://homeassistant.local:8090/`. The add-on publishes port **8090** on the
    same LAN address as Home Assistant, so TVs can reach both services by name.
+
+The add-on builds on-device from the multi-arch Home Assistant Alpine base image
+and installs Node.js from Alpine packages. It supports **aarch64, armv7 and
+amd64**, including 32-bit and 64-bit Raspberry Pi Home Assistant installations.
+No prebuilt image or separate build server is needed.
+
+A local install is still possible by copying `config-server/` to
+`/addons/aurora_config/` and installing it as a local add-on.
 
 Profiles are stored in `/data/aurora/` inside the add-on container and survive
 updates. An example profile is included in `config-server/data/example.json`;

@@ -7,25 +7,19 @@ TVs.
 The add-on publishes **port 8090 on the same LAN address as Home Assistant**.
 TVs can therefore reach it at `http://homeassistant.local:8090/`.
 
-## Install as a local add-on
+## Install from the GitHub repository
 
-1. Copy this whole `config-server/` folder to your Home Assistant add-ons
-   directory, for example via the Samba share:
+1. In Home Assistant open **Settings → Add-ons → Add-on store**.
+2. Open the **⋮** menu → **Repositories**.
+3. Add:
 
    ```text
-   /addons/aurora_config/
-     config.yaml
-     Dockerfile
-     run.sh
-     server.js
-     epg.js
-     public/
-     data/
+   https://github.com/chrisclayson/aurora-tv
    ```
 
-2. In Home Assistant open **Settings → Add-ons → Add-on store**, refresh, and
-   install **Aurora TV Configuration**.
-3. Set the add-on options:
+4. Find **Aurora TV Configuration** under the **Aurora TV** repository and
+   install it.
+5. Set the add-on options:
 
    ```yaml
    config_token: "choose-a-token"
@@ -38,9 +32,21 @@ TVs can therefore reach it at `http://homeassistant.local:8090/`.
 
    `public_url` is used for generated bootstrap URLs. It defaults to
    `http://homeassistant.local:8090` when left empty.
-4. Start it. The sidebar panel **Aurora TV** opens the UI through ingress.
+6. Start it. The sidebar panel **Aurora TV** opens the UI through ingress.
    The same UI is available directly at `http://homeassistant.local:8090/` for
    TVs and for generating bootstrap URLs.
+
+The add-on builds on device from the multi-arch Home Assistant Alpine base
+image (`ghcr.io/home-assistant/base:3.23`) and installs Node.js from Alpine
+packages. It supports `aarch64`, `armv7` and `amd64`, so it builds on Raspberry
+Pi OS 64-bit and 32-bit Home Assistant installations. No prebuilt image or
+separate build server is required.
+
+### Local add-on alternative
+
+If you prefer not to add the Git repository, copy the `config-server/` folder to
+`/addons/aurora_config/` and install it as a local add-on. Keep
+`config.yaml` at the add-on folder root.
 
 ## Endpoints
 
