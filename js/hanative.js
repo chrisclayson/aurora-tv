@@ -53,7 +53,17 @@
     live: {
       index: -1,
       entityId: ''
-    }
+    },
+    detail: {
+      entityId: '',
+      index: 0,
+      controls: [],
+      values: {},
+      clearTimer: null,
+      returnScreen: 'ha',
+      ignoreOkUntil: 0
+    },
+    press: null
   };
 
   function q(sel) { return document.querySelector(sel); }
@@ -209,6 +219,12 @@
       musicNode.className = 'ha-conn ' + cls;
       var musicText = q('#music-conn-label');
       if (musicText) musicText.textContent = label;
+    }
+    var detailNode = q('#ha-detail-conn');
+    if (detailNode) {
+      detailNode.className = 'ha-conn ' + cls;
+      var detailText = q('#ha-detail-conn-label');
+      if (detailText) detailText.textContent = label;
     }
   }
 
@@ -398,7 +414,618 @@
     });
   }
 
+  /* ---------- detailed entity controls ---------- */
+
+  var MP_PAUSE = 1;
+  var MP_VOLUME_SET = 4;
+  var MP_VOLUME_MUTE = 8;
+  var MP_PREVIOUS = 16;
+  var MP_NEXT = 32;
+  var MP_STOP = 4096;
+  var MP_PLAY = 16384;
+  var MP_VOLUME_STEP = 1024;
+
+  var DETAIL_COLORS = [
+    { name: 'Warm white', rgb: [255, 214, 170] },
+    { name: 'White', rgb: [255, 255, 255] },
+    { name: 'Red', rgb: [255, 40, 40] },
+    { name: 'Orange', rgb: [255, 140, 20] },
+    { name: 'Yellow', rgb: [255, 220, 40] },
+    { name: 'Green', rgb: [40, 210, 90] },
+    { name: 'Cyan', rgb: [40, 210, 220] },
+    { name: 'Blue', rgb: [60, 100, 255] },
+    { name: 'Purple', rgb: [160, 70, 255] }
+  ];
+
+  function num(value, fallback) {
+    var n = Number(value);
+    return isFinite(n) ? n : fallback;
+  }
+
+  function detailValue(key, fallback) {
+    var values = state.detail.values || {};
+    return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : fallback;
+  }
+
+  function clearDetailTimer() {
+    if (state.detail.clearTimer) {
+      clearTimeout(state.detail.clearTimer);
+      state.detail.clearTimer = null;
+    }
+  }
+
+  function scheduleDetailClear() {
+    clearDetailTimer();
+    state.detail.clearTimer = setTimeout(function () {
+      state.detail.values = {};
+      if (A.App && A.App.state && A.App.state.screen === 'ha-detail') renderDetail();
+    }, 4500);
+  }
+
+  function detailCall(domain, service, data, key, value) {
+    var payload = { entity_id: state.detail.entityId };
+    Object.keys(data || {}).forEach(function (item) { payload[item] = data[item]; });
+    if (key) {
+      state.detail.values[key] = value;
+      scheduleDetailClear();
+      if (A.App && A.App.state && A.App.state.screen === 'ha-detail') renderDetail();
+    }
+    return A.HA.callService(domain, service, payload).then(function () {
+      if (A.App && A.App.state && A.App.state.screen === 'ha-detail') {
+        setTimeout(function () {
+          if (A.App.state.screen === 'ha-detail') renderDetail();
+        }, 350);
+      }
+    }).catch(function (err) {
+      A.UI.toast('Home Assistant: ' + err.message, 'error', 4500);
+    });
+  }
+
+  function optionPayload(field, value) {
+    var data = {};
+    data[field] = value;
+    return data;
+  }
+
+  function addOptionControl(controls, key, label, options, current, domain, service, field) {
+    if (!Array.isArray(options) || !options.length) return;
+    controls.push({
+      kind: 'options',
+      key: key,
+      label: label,
+      options: options.slice(),
+      value: detailValue(key, current),
+      cycle: function (direction) {
+        var list = this.options;
+        var now = detailValue(key, current);
+        var index = list.indexOf(now);
+        if (index < 0) index = direction > 0 ? -1 : 0;
+        var next = list[(index + direction + list.length) % list.length];
+        detailCall(domain, service, optionPayload(field, next), key, next);
+      }
+    });
+  }
+
+  function nearestColorIndex(rgb) {
+    if (!Array.isArray(rgb) || rgb.length < 3) return 1;
+    var best = 0;
+    var distance = Infinity;
+    DETAIL_COLORS.forEach(function (color, index) {
+      var r = rgb[0] - color.rgb[0], g = rgb[1] - color.rgb[1], b = rgb[2] - color.rgb[2];
+      var d = r * r + g * g + b * b;
+      if (d < distance) { distance = d; best = index; }
+    });
+    return best;
+  }
+
+  function buildDetailControls(id) {
+    var ent = entity(id);
+    if (!ent) return [];
+    var attrs = ent.attributes || {};
+    var domain = domainOf(id);
+    var controls = [];
+    var features = num(attrs.supported_features, 0);
+
+    if (domain === 'climate') {
+      var target = attrs.temperature;
+      if (target != null && isFinite(Number(target))) {
+        var minTemp = num(attrs.min_temp, 7);
+        var maxTemp = num(attrs.max_temp, 35);
+        var tempStep = num(attrs.target_temp_step, 0.5);
+        controls.push({
+          kind: 'stepper',
+          key: 'temperature',
+          label: 'Target temperature',
+          value: num(detailValue('temperature', target), target),
+          min: minTemp,
+          max: maxTemp,
+          step: tempStep,
+          format: function (value) { return value.toFixed(1) + '°'; },
+          change: function (direction) {
+            var now = num(detailValue('temperature', target), target);
+            var next = Math.round((now + direction * tempStep) / tempStep) * tempStep;
+            next = Math.max(minTemp, Math.min(maxTemp, next));
+            detailCall('climate', 'set_temperature', { temperature: next }, 'temperature', next);
+          }
+        });
+      }
+      addOptionControl(controls, 'hvac_mode', 'Mode', attrs.hvac_modes,
+        attrs.hvac_mode || ent.state, 'climate', 'set_hvac_mode', 'hvac_mode');
+      addOptionControl(controls, 'preset_mode', 'Preset', attrs.preset_modes,
+        attrs.preset_mode, 'climate', 'set_preset_mode', 'preset_mode');
+      addOptionControl(controls, 'fan_mode', 'Fan speed', attrs.fan_modes,
+        attrs.fan_mode, 'climate', 'set_fan_mode', 'fan_mode');
+      addOptionControl(controls, 'swing_mode', 'Swing', attrs.swing_modes,
+        attrs.swing_mode, 'climate', 'set_swing_mode', 'swing_mode');
+    } else if (domain === 'light') {
+      var modes = Array.isArray(attrs.supported_color_modes) ? attrs.supported_color_modes : [];
+      var dimmable = attrs.brightness != null || modes.some(function (mode) { return mode !== 'onoff'; });
+      if (dimmable) {
+        var brightness = attrs.brightness == null ? 0 : Math.round(Number(attrs.brightness) / 255 * 100);
+        controls.push({
+          kind: 'stepper',
+          key: 'brightness',
+          label: 'Brightness',
+          value: num(detailValue('brightness', brightness), brightness),
+          min: 0,
+          max: 100,
+          step: 5,
+          format: function (value) { return value + '%'; },
+          change: function (direction) {
+            var now = num(detailValue('brightness', brightness), brightness);
+            var next = Math.max(0, Math.min(100, now + direction * 5));
+            detailCall('light', 'turn_on', { brightness_pct: next }, 'brightness', next);
+          }
+        });
+      }
+      var rgbModes = ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'];
+      var hasRgb = rgbModes.some(function (mode) { return modes.indexOf(mode) !== -1; }) ||
+        Array.isArray(attrs.rgb_color) || Array.isArray(attrs.hs_color);
+      if (hasRgb) {
+        var colorIndex = num(detailValue('color', nearestColorIndex(attrs.rgb_color)), 1);
+        controls.push({
+          kind: 'colors',
+          key: 'color',
+          label: 'Colour',
+          colors: DETAIL_COLORS,
+          value: colorIndex,
+          cycle: function (direction) {
+            var now = num(detailValue('color', colorIndex), colorIndex);
+            var next = (now + direction + DETAIL_COLORS.length) % DETAIL_COLORS.length;
+            detailCall('light', 'turn_on', { rgb_color: DETAIL_COLORS[next].rgb }, 'color', next);
+          }
+        });
+      } else if (attrs.color_temp_kelvin != null || attrs.min_color_temp_kelvin != null) {
+        var minK = num(attrs.min_color_temp_kelvin, 2200);
+        var maxK = num(attrs.max_color_temp_kelvin, 6500);
+        var kelvin = num(attrs.color_temp_kelvin, (minK + maxK) / 2);
+        controls.push({
+          kind: 'stepper',
+          key: 'color_temp',
+          label: 'Colour temperature',
+          value: num(detailValue('color_temp', kelvin), kelvin),
+          min: minK,
+          max: maxK,
+          step: 250,
+          format: function (value) { return Math.round(value) + 'K'; },
+          change: function (direction) {
+            var now = num(detailValue('color_temp', kelvin), kelvin);
+            var next = Math.max(minK, Math.min(maxK, now + direction * 250));
+            detailCall('light', 'turn_on', { color_temp_kelvin: next }, 'color_temp', next);
+          }
+        });
+      } else if (attrs.color_temp != null || attrs.min_mireds != null) {
+        var minM = num(attrs.min_mireds, 153);
+        var maxM = num(attrs.max_mireds, 500);
+        var mired = num(attrs.color_temp, 300);
+        controls.push({
+          kind: 'stepper',
+          key: 'color_temp',
+          label: 'Colour temperature',
+          value: num(detailValue('color_temp', mired), mired),
+          min: minM,
+          max: maxM,
+          step: 20,
+          format: function (value) { return Math.round(value) + ' mired'; },
+          change: function (direction) {
+            var now = num(detailValue('color_temp', mired), mired);
+            var next = Math.max(minM, Math.min(maxM, now + direction * 20));
+            detailCall('light', 'turn_on', { color_temp: next }, 'color_temp', next);
+          }
+        });
+      }
+      addOptionControl(controls, 'effect', 'Effect', attrs.effect_list,
+        attrs.effect, 'light', 'turn_on', 'effect');
+    } else if (domain === 'media_player') {
+      if (features & MP_PREVIOUS) {
+        controls.push({ kind: 'button', label: 'Previous', icon: 'previous', activate: function () {
+          detailCall('media_player', 'media_previous_track', {}, '');
+        } });
+      }
+      if (features & MP_PLAY) {
+        controls.push({ kind: 'button', label: 'Play', icon: 'play', activate: function () {
+          detailCall('media_player', 'media_play', {}, '');
+        } });
+      }
+      if (features & MP_PAUSE) {
+        controls.push({ kind: 'button', label: 'Pause', icon: 'pause', activate: function () {
+          detailCall('media_player', 'media_pause', {}, '');
+        } });
+      }
+      if (!(features & (MP_PLAY | MP_PAUSE)) && (ent.state === 'playing' || ent.state === 'paused')) {
+        var playing = ent.state === 'playing';
+        controls.push({ kind: 'button', label: playing ? 'Pause' : 'Play', icon: playing ? 'pause' : 'play', activate: function () {
+          detailCall('media_player', 'media_play_pause', {}, '');
+        } });
+      }
+      if (features & MP_STOP) {
+        controls.push({ kind: 'button', label: 'Stop', icon: 'stop', activate: function () {
+          detailCall('media_player', 'media_stop', {}, '');
+        } });
+      }
+      if (features & MP_NEXT) {
+        controls.push({ kind: 'button', label: 'Next', icon: 'next', activate: function () {
+          detailCall('media_player', 'media_next_track', {}, '');
+        } });
+      }
+      if (features & MP_VOLUME_SET) {
+        var volume = attrs.volume_level == null ? 0 : Math.round(Number(attrs.volume_level) * 100);
+        controls.push({
+          kind: 'stepper',
+          key: 'volume',
+          label: 'Volume',
+          value: num(detailValue('volume', volume), volume),
+          min: 0,
+          max: 100,
+          step: 5,
+          format: function (value) { return value + '%'; },
+          change: function (direction) {
+            var now = num(detailValue('volume', volume), volume);
+            var next = Math.max(0, Math.min(100, now + direction * 5));
+            detailCall('media_player', 'volume_set', { volume_level: next / 100 }, 'volume', next);
+          }
+        });
+      } else if (features & MP_VOLUME_STEP) {
+        controls.push({ kind: 'button', label: 'Volume down', icon: 'volume', activate: function () {
+          detailCall('media_player', 'volume_down', {}, '');
+        } });
+        controls.push({ kind: 'button', label: 'Volume up', icon: 'volume', activate: function () {
+          detailCall('media_player', 'volume_up', {}, '');
+        } });
+      }
+      if (features & MP_VOLUME_MUTE) {
+        var muted = detailValue('mute', !!attrs.is_volume_muted);
+        controls.push({ kind: 'button', label: muted ? 'Unmute' : 'Mute', icon: 'volume', activate: function () {
+          var next = !muted;
+          detailCall('media_player', 'volume_mute', { is_volume_muted: next }, 'mute', next);
+        } });
+      }
+      addOptionControl(controls, 'source', 'Source', attrs.source_list,
+        attrs.source, 'media_player', 'select_source', 'source');
+    } else if (domain === 'select' || domain === 'input_select') {
+      addOptionControl(controls, 'option', 'Option', attrs.options,
+        ent.state, domain, 'select_option', 'option');
+    } else if (domain === 'cover') {
+      if (attrs.current_position != null && (features & 4)) {
+        var position = num(attrs.current_position, 0);
+        controls.push({
+          kind: 'stepper',
+          key: 'position',
+          label: 'Position',
+          value: num(detailValue('position', position), position),
+          min: 0,
+          max: 100,
+          step: 5,
+          format: function (value) { return Math.round(value) + '%'; },
+          change: function (direction) {
+            var now = num(detailValue('position', position), position);
+            var next = Math.max(0, Math.min(100, now + direction * 5));
+            detailCall('cover', 'set_cover_position', { position: next }, 'position', next);
+          }
+        });
+      }
+    } else if (domain === 'fan') {
+      if (attrs.percentage != null) {
+        var fanStep = num(attrs.percentage_step, 5);
+        var fanPct = num(attrs.percentage, 0);
+        controls.push({
+          kind: 'stepper',
+          key: 'percentage',
+          label: 'Fan speed',
+          value: num(detailValue('percentage', fanPct), fanPct),
+          min: 0,
+          max: 100,
+          step: fanStep,
+          format: function (value) { return Math.round(value) + '%'; },
+          change: function (direction) {
+            var now = num(detailValue('percentage', fanPct), fanPct);
+            var next = Math.max(0, Math.min(100, now + direction * fanStep));
+            detailCall('fan', 'set_percentage', { percentage: next }, 'percentage', next);
+          }
+        });
+      }
+      addOptionControl(controls, 'preset_mode', 'Preset', attrs.preset_modes,
+        attrs.preset_mode, 'fan', 'set_preset_mode', 'preset_mode');
+      if (attrs.oscillating != null) {
+        var oscillating = detailValue('oscillating', !!attrs.oscillating);
+        controls.push({ kind: 'button', label: oscillating ? 'Stop oscillating' : 'Oscillate', icon: 'wind', activate: function () {
+          var next = !oscillating;
+          detailCall('fan', 'oscillate', { oscillating: next }, 'oscillating', next);
+        } });
+      }
+    } else if (domain === 'number' || domain === 'input_number') {
+      if (attrs.min != null && attrs.max != null) {
+        var minNum = num(attrs.min, 0);
+        var maxNum = num(attrs.max, 100);
+        var numStep = num(attrs.step, 1);
+        var currentNum = num(ent.state, minNum);
+        controls.push({
+          kind: 'stepper',
+          key: 'number',
+          label: domainName(domain),
+          value: num(detailValue('number', currentNum), currentNum),
+          min: minNum,
+          max: maxNum,
+          step: numStep,
+          format: function (value) { return String(Math.round(value * 100) / 100); },
+          change: function (direction) {
+            var now = num(detailValue('number', currentNum), currentNum);
+            var next = Math.round((now + direction * numStep) / numStep) * numStep;
+            next = Math.max(minNum, Math.min(maxNum, next));
+            detailCall(domain, 'set_value', { value: next }, 'number', next);
+          }
+        });
+      }
+    }
+
+    return controls;
+  }
+
+  function detailMediaHero(ent, id) {
+    var attrs = ent.attributes || {};
+    var picture = attrs.entity_picture || '';
+    if (picture && picture.charAt(0) === '/' && A.HA.base) picture = A.HA.base() + picture;
+    var title = attrs.media_title || attrs.media_series_title || 'Nothing playing';
+    var artist = attrs.media_artist || attrs.media_album_artist || '';
+    var album = attrs.media_album_name || '';
+    return '<div class="ha-detail-media">' +
+      '<div class="ha-detail-art">' +
+      '<span class="ha-detail-art-fallback">' + A.UI.icon('music') + '</span>' +
+      (picture ? '<img id="ha-detail-art-img" src="' + esc(picture) + '" alt="">' : '') +
+      '</div>' +
+      '<div class="ha-detail-media-info">' +
+      '<span class="ha-detail-state">' + esc(stateText(ent, id)) + '</span>' +
+      '<h2>' + esc(title) + '</h2>' +
+      (artist ? '<p>' + esc(artist) + '</p>' : '') +
+      (album ? '<p class="muted">' + esc(album) + '</p>' : '') +
+      '</div></div>';
+  }
+
+  function detailRow(control, index, focused) {
+    var cls = 'ha-detail-row' + (focused ? ' focused' : '');
+    if (control.kind === 'stepper') {
+      return '<div class="' + cls + '">' +
+        '<span class="ha-detail-label">' + esc(control.label) + '</span>' +
+        '<span class="ha-detail-stepper">' +
+        '<span class="ha-detail-step">−</span>' +
+        '<span class="ha-detail-value">' + esc(control.format(control.value)) + '</span>' +
+        '<span class="ha-detail-step">+</span>' +
+        '</span></div>';
+    }
+    if (control.kind === 'options') {
+      return '<div class="' + cls + ' options">' +
+        '<div class="ha-detail-row-head"><span class="ha-detail-label">' + esc(control.label) + '</span>' +
+        '<span class="ha-detail-current-option">' + esc(control.value || '') + '</span></div>' +
+        '<div class="ha-detail-options">' + control.options.map(function (option) {
+          return '<span class="ha-detail-option' + (option === control.value ? ' active' : '') + '">' +
+            esc(option) + '</span>';
+        }).join('') + '</div></div>';
+    }
+    if (control.kind === 'colors') {
+      var current = control.colors[control.value] || control.colors[0];
+      return '<div class="' + cls + ' options">' +
+        '<div class="ha-detail-row-head"><span class="ha-detail-label">' + esc(control.label) + '</span>' +
+        '<span class="ha-detail-current-option">' + esc(current ? current.name : '') + '</span></div>' +
+        '<div class="ha-detail-colors">' + control.colors.map(function (color, i) {
+          return '<span class="ha-detail-color' + (i === control.value ? ' active' : '') + '" ' +
+            'style="background:rgb(' + color.rgb.join(',') + ')" title="' + esc(color.name) + '"></span>';
+        }).join('') + '</div></div>';
+    }
+    return '<div class="' + cls + '">' +
+      '<span class="ha-detail-button"><span class="ha-detail-button-icon">' +
+      A.UI.icon(control.icon || 'play') + '</span>' +
+      '<span class="ha-detail-label">' + esc(control.label) + '</span></span></div>';
+  }
+
+  function renderDetail() {
+    var d = state.detail;
+    var id = d.entityId;
+    var ent = entity(id);
+    if (!ent) { closeDetail(); return; }
+    var attrs = ent.attributes || {};
+    var domain = domainOf(id);
+    updateConnection();
+    var title = q('#ha-detail-title');
+    var eyebrow = q('#ha-detail-eyebrow');
+    if (title) title.textContent = entityName(id, ent);
+    if (eyebrow) eyebrow.textContent = 'HOME ASSISTANT · ' + domainName(domain).toUpperCase();
+
+    var controls = buildDetailControls(id);
+    d.controls = controls;
+    if (!controls.length) { closeDetail(); return; }
+    if (d.index >= controls.length) d.index = controls.length - 1;
+
+    var html = '';
+    if (domain === 'media_player') html += detailMediaHero(ent, id);
+    if (domain === 'climate' && attrs.current_temperature != null) {
+      var climateState = String(attrs.hvac_action || ent.state || '').replace(/_/g, ' ');
+      if (climateState) climateState = climateState.charAt(0).toUpperCase() + climateState.slice(1);
+      html += '<div class="ha-detail-summary">' +
+        '<span class="ha-detail-current">' + esc(String(attrs.current_temperature)) + '°</span>' +
+        '<span class="ha-detail-sub">' + esc(climateState) + '</span></div>';
+    }
+    html += '<div class="ha-detail-list">' + controls.map(function (control, index) {
+      return detailRow(control, index, index === d.index);
+    }).join('') + '</div>';
+
+    var body = q('#ha-detail-body');
+    if (body) {
+      body.innerHTML = html;
+      var art = q('#ha-detail-art-img');
+      if (art) {
+        art.onerror = function () { this.style.display = 'none'; };
+      }
+      var focused = body.querySelector('.ha-detail-row.focused');
+      if (focused) {
+        try { focused.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {
+          try { focused.scrollIntoView(); } catch (err) { /* ignore */ }
+        }
+      }
+    }
+  }
+
+  function openDetailForEntity(id, returnScreen) {
+    state.detail.entityId = id;
+    state.detail.index = 0;
+    state.detail.values = {};
+    state.detail.returnScreen = returnScreen || 'ha';
+    state.detail.ignoreOkUntil = returnScreen === 'home' ? Date.now() + 420 : 0;
+    clearDetailTimer();
+    var controls = buildDetailControls(id);
+    if (!controls.length) {
+      state.detail.entityId = '';
+      state.detail.values = {};
+      state.detail.returnScreen = 'ha';
+      var domain = domainOf(id);
+      if (['sensor', 'binary_sensor', 'weather', 'sun'].indexOf(domain) !== -1) {
+        infoForEntity(id);
+      } else {
+        A.UI.toast('No detailed controls for this entity', '', 2500);
+      }
+      return;
+    }
+    showScreen('ha-detail');
+    renderDetail();
+  }
+
+  function openDetail(index) {
+    var page = currentPage();
+    var widget = page.widgets[index];
+    if (!widget) return;
+    openDetailForEntity(widget.entity, 'ha');
+  }
+
+  function closeDetail() {
+    var back = state.detail.returnScreen || 'ha';
+    clearDetailTimer();
+    state.detail.values = {};
+    state.detail.controls = [];
+    state.detail.entityId = '';
+    state.detail.index = 0;
+    state.detail.returnScreen = 'ha';
+    state.detail.ignoreOkUntil = 0;
+    if (back === 'home' && A.App && A.App.showHome) {
+      A.App.showHome();
+      return;
+    }
+    showScreen('ha');
+    render();
+  }
+
+  function toggleEntity(id) {
+    if (!id) return;
+    var ent = entity(id);
+    if (!ent) {
+      A.UI.toast('Entity is not available in Home Assistant', 'error', 3500);
+      return;
+    }
+    var domain = domainOf(id);
+    var targetDomain = 'homeassistant';
+    var service = 'toggle';
+    if (domain === 'climate') {
+      targetDomain = 'climate';
+      service = ent.state === 'off' ? 'turn_on' : 'turn_off';
+    }
+    A.HA.callService(targetDomain, service, { entity_id: id }).then(function () {
+      A.UI.toast((service === 'turn_on' ? 'Turned on ' : service === 'turn_off' ? 'Turned off ' : 'Toggled ') + entityName(id, ent), 'ok', 1800);
+    }).catch(function (err) {
+      A.UI.toast('Home Assistant: ' + err.message, 'error', 4500);
+    });
+  }
+
+  function adjustDetail(control, direction) {
+    if (!control) return;
+    if (control.kind === 'stepper' && control.change) control.change(direction);
+    else if (control.kind === 'options' && control.cycle) control.cycle(direction);
+    else if (control.kind === 'colors' && control.cycle) control.cycle(direction);
+  }
+
+  function activateDetail(control) {
+    if (!control) return;
+    if (control.kind === 'stepper' && control.change) control.change(1);
+    else if (control.kind === 'options' && control.cycle) control.cycle(1);
+    else if (control.kind === 'colors' && control.cycle) control.cycle(1);
+    else if (control.kind === 'button' && control.activate) control.activate();
+  }
+
+  function detailKey(code) {
+    if (code === 10009 || code === 27) {
+      closeDetail();
+      return true;
+    }
+    var d = state.detail;
+    if (!d.controls.length) {
+      closeDetail();
+      return true;
+    }
+    if (code === 38 || code === 40) {
+      d.index = U.clamp(d.index + (code === 40 ? 1 : -1), 0, d.controls.length - 1);
+      renderDetail();
+      return true;
+    }
+    var control = d.controls[d.index];
+    if (code === 37 || code === 39) {
+      adjustDetail(control, code === 39 ? 1 : -1);
+      return true;
+    }
+    if (code === 13) {
+      if (Date.now() < (d.ignoreOkUntil || 0)) return true;
+      activateDetail(control);
+      return true;
+    }
+    return false;
+  }
+
+  function cancelWidgetPress() {
+    if (state.press) {
+      clearTimeout(state.press.timer);
+      state.press = null;
+    }
+  }
+
+  function beginWidgetPress(index) {
+    cancelWidgetPress();
+    var press = { index: index, at: Date.now(), long: false, timer: null };
+    press.timer = setTimeout(function () {
+      if (state.press !== press) return;
+      press.long = true;
+      openDetail(index);
+    }, 650);
+    state.press = press;
+  }
+
+  function handleKeyUp(code) {
+    if (code !== 13) return false;
+    var press = state.press;
+    if (!press) return false;
+    clearTimeout(press.timer);
+    state.press = null;
+    if (!press.long) activateWidget(press.index);
+    return true;
+  }
+
   function haKey(code) {
+    if (state.press && code !== 13) cancelWidgetPress();
     if (code === 10009 || code === 27) {
       A.App.showHome();
       return true;
@@ -460,7 +1087,8 @@
       return true;
     }
     if (code === 13) {
-      activateWidget(state.widgetIndex);
+      if (state.press) return true;
+      beginWidgetPress(state.widgetIndex);
       return true;
     }
     return false;
@@ -1477,6 +2105,7 @@
     if (A.UI.modalOpen()) return false;
     var screen = A.App && A.App.state ? A.App.state.screen : '';
     if (screen === 'ha') return haKey(code);
+    if (screen === 'ha-detail') return detailKey(code);
     if (screen === 'ha-browser') return browserKey(code);
     if (screen === 'ha-pages') return pagesKey(code);
     if (screen === 'music') return musicKey(code);
@@ -1489,7 +2118,9 @@
   function onHAChange() {
     if (!A.App || !A.App.state) return;
     var screen = A.App.state.screen;
-    if (screen === 'ha' || screen === 'cameras' || screen === 'music') {
+    if (screen === 'ha-detail') {
+      renderDetail();
+    } else if (screen === 'ha' || screen === 'cameras' || screen === 'music') {
       scheduleRender();
     } else if (screen === 'ha-browser') {
       var b = state.browser;
@@ -1508,6 +2139,7 @@
     if (!A.App || !A.App.state) return;
     var screen = A.App.state.screen;
     if (screen === 'ha') render();
+    else if (screen === 'ha-detail') renderDetail();
     else if (screen === 'ha-pages') renderPages();
     else if (screen === 'ha-browser') renderBrowser();
     else if (screen === 'music') renderMusic();
@@ -1525,6 +2157,9 @@
     tickMusic: tickMusic,
     openCameras: openCameras,
     handleKey: handleKey,
+    handleKeyUp: handleKeyUp,
+    toggleEntity: toggleEntity,
+    openDetailForEntity: openDetailForEntity,
     onHAChange: onHAChange,
     onConfigChange: onConfigChange,
     stopLive: stopLive

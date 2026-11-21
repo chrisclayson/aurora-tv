@@ -27,6 +27,9 @@
     this.calls = {};
     this.callId = 100000;
     this.generation = 0;
+    this.notifications = [];
+    this.notificationMap = {};
+    this.notifySubId = null;
   }
 
   HA.prototype.on = function (event, fn) {
@@ -59,7 +62,11 @@
       this.connected = false;
       this.restOk = false;
       this.states = {};
+      this.notifications = [];
+      this.notificationMap = {};
+      this.notifySubId = null;
       this.emit('change');
+      this.emit('notifications');
       return;
     }
     this.stopped = false;
@@ -88,6 +95,7 @@
     }
     this.connected = false;
     this.restOk = false;
+    this.notifySubId = null;
   };
 
   HA.prototype._connect = function () {
@@ -140,6 +148,7 @@
         self.lastUpdate = Date.now();
         self._send({ id: self.msgId++, type: 'get_states' });
         self._send({ id: self.msgId++, type: 'subscribe_events', event_type: 'state_changed' });
+        self._subscribeNotifications();
         self.emit('change');
         return;
       }
@@ -157,13 +166,21 @@
         }
         return;
       }
-      if (msg.type === 'event' && msg.event && msg.event.event_type === 'state_changed') {
-        var data = msg.event.data || {};
-        if (data.entity_id && data.new_state) {
-          self.states[data.entity_id] = data.new_state;
-          self.lastUpdate = Date.now();
-          self.emit('state', data.entity_id, data.new_state);
-          self.emit('change');
+      if (msg.type === 'event' && msg.event) {
+        if (msg.id === self.notifySubId && msg.event.type &&
+            (msg.event.type === 'current' || msg.event.type === 'added' ||
+             msg.event.type === 'removed' || msg.event.type === 'updated')) {
+          self._applyNotificationUpdate(msg.event);
+          return;
+        }
+        if (msg.event.event_type === 'state_changed') {
+          var data = msg.event.data || {};
+          if (data.entity_id && data.new_state) {
+            self.states[data.entity_id] = data.new_state;
+            self.lastUpdate = Date.now();
+            self.emit('state', data.entity_id, data.new_state);
+            self.emit('change');
+          }
         }
       }
     };
@@ -209,6 +226,91 @@
     this.lastUpdate = Date.now();
     this.emit('change');
     this.emit('states');
+  };
+
+  HA.prototype._subscribeNotifications = function () {
+    if (!this.connected || !this.ws || this.ws.readyState !== 1) return;
+    this.notifySubId = this.callId++;
+    this._send({
+      id: this.notifySubId,
+      type: 'persistent_notification/subscribe'
+    });
+  };
+
+  HA.prototype._applyNotificationUpdate = function (event) {
+    var items = event.notifications || {};
+    if (event.type === 'current') {
+      this.notificationMap = {};
+    }
+    Object.keys(items).forEach(function (id) {
+      var item = items[id];
+      if (event.type === 'removed') {
+        delete this.notificationMap[id];
+      } else if (item) {
+        this.notificationMap[id] = item;
+      }
+    }, this);
+    this._sortNotifications();
+    this.emit('notifications');
+    this.emit('change');
+  };
+
+  HA.prototype._sortNotifications = function () {
+    this.notifications = Object.keys(this.notificationMap).map(function (id) {
+      return this.notificationMap[id];
+    }, this).sort(function (a, b) {
+      var ta = Date.parse(a.created_at || '') || 0;
+      var tb = Date.parse(b.created_at || '') || 0;
+      return tb - ta;
+    });
+  };
+
+  HA.prototype.notificationList = function () {
+    return this.notifications.slice();
+  };
+
+  HA.prototype.refreshNotifications = function () {
+    var self = this;
+    if (!this.connected) return Promise.resolve(this.notifications);
+    return this.command('persistent_notification/get').then(function (list) {
+      var map = {};
+      (list || []).forEach(function (item) {
+        if (item && item.notification_id) map[item.notification_id] = item;
+      });
+      self.notificationMap = map;
+      self._sortNotifications();
+      self.emit('notifications');
+      return self.notifications;
+    });
+  };
+
+  HA.prototype.dismissNotification = function (notificationId) {
+    var self = this;
+    if (!notificationId) return Promise.resolve(false);
+    delete this.notificationMap[notificationId];
+    this._sortNotifications();
+    this.emit('notifications');
+    return this.callService('persistent_notification', 'dismiss', {
+      notification_id: notificationId
+    }).then(function () {
+      return true;
+    }).catch(function (err) {
+      self.refreshNotifications().catch(function () { /* ignore */ });
+      throw err;
+    });
+  };
+
+  HA.prototype.dismissAllNotifications = function () {
+    var self = this;
+    this.notificationMap = {};
+    this._sortNotifications();
+    this.emit('notifications');
+    return this.callService('persistent_notification', 'dismiss_all', {}).then(function () {
+      return true;
+    }).catch(function (err) {
+      self.refreshNotifications().catch(function () { /* ignore */ });
+      throw err;
+    });
   };
 
   /* Pull the full state list now. Used after media service calls so the
@@ -376,6 +478,183 @@
     });
   };
 
+  HA.prototype.calendars = function () {
+    var self = this;
+    return Object.keys(this.states).filter(function (id) {
+      return id.indexOf('calendar.') === 0;
+    }).map(function (id) {
+      var entity = self.states[id];
+      var attrs = (entity && entity.attributes) || {};
+      return {
+        id: id,
+        name: attrs.friendly_name || id,
+        state: entity ? entity.state : 'unavailable'
+      };
+    }).sort(function (a, b) {
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  function parseCalendarDate(value) {
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+    if (typeof value === 'number') return new Date(value);
+    if (typeof value !== 'string') return null;
+    var text = value.trim();
+    if (!text) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return new Date(text + 'T00:00:00');
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(text)) text = text.replace(' ', 'T');
+    var date = new Date(text);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  HA.prototype.calendarEvents = function (start, end) {
+    var self = this;
+    var calendars = this.calendars();
+    var ids = calendars.map(function (item) { return item.id; });
+    if (!ids.length) return Promise.resolve([]);
+
+    var now = new Date();
+    var from = start instanceof Date ? start : new Date(now.getTime());
+    var to = end instanceof Date ? end : new Date(now.getTime() + 3 * 24 * 3600000);
+    var timing = {
+      start_date_time: from.toISOString(),
+      end_date_time: to.toISOString()
+    };
+    var restData = {
+      entity_id: ids,
+      start_date_time: timing.start_date_time,
+      end_date_time: timing.end_date_time
+    };
+
+    function parseEvent(calendarId, raw) {
+      if (!raw) return null;
+      var startValue = raw.start;
+      var startDate = parseCalendarDate(startValue);
+      if (!startDate) return null;
+      var endDate = parseCalendarDate(raw.end) || new Date(startDate.getTime() + 3600000);
+      var allDay = raw.all_day === true ||
+        (typeof startValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startValue.trim()));
+      return {
+        calendarId: calendarId,
+        summary: String(raw.summary || raw.title || '').trim() || 'Untitled event',
+        start: startDate,
+        end: endDate,
+        allDay: allDay,
+        location: String(raw.location || '').trim()
+      };
+    }
+
+    function collect(payload) {
+      var data = payload || {};
+      if (data.service_response && typeof data.service_response === 'object') data = data.service_response;
+      if (data.response && typeof data.response === 'object') data = data.response;
+      var events = [];
+      function add(calendarId, list) {
+        (Array.isArray(list) ? list : []).forEach(function (raw) {
+          var event = parseEvent(calendarId, raw);
+          if (event) events.push(event);
+        });
+      }
+      Object.keys(data).forEach(function (key) {
+        if (key.indexOf('calendar.') !== 0) return;
+        var entry = data[key];
+        add(key, entry && entry.events);
+      });
+      // Some HA versions return a single calendar's response without the key.
+      if (Array.isArray(data.events)) add(ids[0] || '', data.events);
+      events.sort(function (a, b) { return a.start - b.start; });
+      return events;
+    }
+
+    function rest() {
+      return fetch(self.base() + '/api/services/calendar/get_events?return_response', {
+        method: 'POST',
+        headers: self._headers(),
+        body: JSON.stringify(restData)
+      }).then(function (res) {
+        if (!res.ok) throw new Error('Calendar request failed (HTTP ' + res.status + ')');
+        return res.json();
+      }).then(collect);
+    }
+
+    var request = {
+      domain: 'calendar',
+      service: 'get_events',
+      target: { entity_id: ids },
+      service_data: timing,
+      return_response: true
+    };
+
+    if (this.connected && this.ws && this.ws.readyState === 1) {
+      return this.command('call_service', request).then(collect).catch(rest);
+    }
+    return rest();
+  };
+
+  HA.prototype.weatherForecast = function (count) {
+    var self = this;
+    var id = this.cfg && this.cfg.weatherEntity;
+    if (!id) return Promise.resolve([]);
+    var limit = Math.max(1, Number(count) || 3);
+    var request = {
+      domain: 'weather',
+      service: 'get_forecasts',
+      target: { entity_id: id },
+      service_data: { type: 'hourly' },
+      return_response: true
+    };
+    var restData = { entity_id: id, type: 'hourly' };
+
+    function collect(payload) {
+      var data = payload || {};
+      if (data.service_response && typeof data.service_response === 'object') data = data.service_response;
+      if (data.response && typeof data.response === 'object') data = data.response;
+      var entry = data[id];
+      if (!entry) {
+        Object.keys(data).some(function (key) {
+          if (key.indexOf('weather.') === 0) {
+            entry = data[key];
+            return true;
+          }
+          return false;
+        });
+      }
+      if (!entry && Array.isArray(data.forecast)) entry = data;
+      var list = (entry && entry.forecast) || [];
+      var now = Date.now();
+      return list.map(function (item) {
+        var time = item && item.datetime ? new Date(item.datetime) : null;
+        if (!time || isNaN(time.getTime())) return null;
+        return {
+          time: time,
+          temperature: item.temperature == null ? null : Number(item.temperature),
+          precipitation: item.precipitation_probability == null ? null : Number(item.precipitation_probability),
+          condition: item.condition || ''
+        };
+      }).filter(function (item) {
+        return item && item.time.getTime() > now - 45 * 60000;
+      }).sort(function (a, b) {
+        return a.time - b.time;
+      }).slice(0, limit);
+    }
+
+    function rest() {
+      return fetch(self.base() + '/api/services/weather/get_forecasts?return_response', {
+        method: 'POST',
+        headers: self._headers(),
+        body: JSON.stringify(restData)
+      }).then(function (res) {
+        if (!res.ok) throw new Error('Weather request failed (HTTP ' + res.status + ')');
+        return res.json();
+      }).then(collect);
+    }
+
+    if (this.connected && this.ws && this.ws.readyState === 1) {
+      return this.command('call_service', request).then(collect).catch(rest);
+    }
+    return rest();
+  };
+
   HA.prototype.cameraStream = function (entityId) {
     var self = this;
     return this.command('camera/stream', { entity_id: entityId }).then(function (result) {
@@ -417,6 +696,17 @@
     });
   };
 
+  HA.prototype.playChannel = function (number) {
+    if (!this.canControlTv()) return Promise.reject(new Error('No HA tvEntity configured'));
+    var channel = String(number == null ? '' : number).trim().replace(/\.0+$/, '');
+    if (!channel) return Promise.reject(new Error('No channel number'));
+    return this.callService('media_player', 'play_media', {
+      entity_id: this.cfg.tvEntity,
+      media_content_id: channel,
+      media_content_type: 'channel'
+    });
+  };
+
   HA.prototype.turnOffTv = function () {
     if (!this.canControlTv()) return Promise.reject(new Error('No HA tvEntity configured'));
     return this.callService('media_player', 'turn_off', { entity_id: this.cfg.tvEntity });
@@ -447,12 +737,61 @@
     };
   };
 
+  HA.prototype._climatePack = function (id) {
+    if (!id) return null;
+    var entity = this.states[id];
+    if (!entity) return { id: id, name: id, state: 'unavailable', current: null, unit: '' };
+    var attrs = entity.attributes || {};
+    var current = attrs.current_temperature;
+    var value = current == null || current === '' ? null : Number(current);
+    var target = attrs.temperature != null ? Number(attrs.temperature) : null;
+    if (target != null && !isFinite(target)) target = null;
+    return {
+      id: id,
+      name: attrs.friendly_name || id,
+      state: entity.state,
+      current: isFinite(value) ? value : null,
+      target: target,
+      action: attrs.hvac_action || '',
+      unit: attrs.temperature_unit || attrs.unit_of_measurement || '°C'
+    };
+  };
+
   HA.prototype.sensors = function () {
-    if (!this.configured) return { light: null, power: null };
+    if (!this.configured) return { light: null, climate: null, power: null, gas: null };
     return {
       light: this._pack(this.cfg.lightEntity),
-      power: this._pack(this.cfg.powerEntity)
+      climate: this._climatePack(this.cfg.climateEntity),
+      power: this._pack(this.cfg.powerEntity),
+      gas: this._pack(this.cfg.gasEntity)
     };
+  };
+
+  HA.prototype.history = function (entityId, hours) {
+    var self = this;
+    if (!this.configured) return Promise.reject(new Error('Home Assistant is not configured'));
+    if (!entityId) return Promise.reject(new Error('No history entity selected'));
+    var end = new Date();
+    var start = new Date(end.getTime() - (Number(hours) || 24) * 3600000);
+    var url = this.base() + '/api/history/period/' + encodeURIComponent(start.toISOString()) +
+      '?filter_entity_id=' + encodeURIComponent(entityId) + '&minimal_response';
+    return fetch(url, { headers: this._headers(), cache: 'no-store' }).then(function (res) {
+      if (!res.ok) throw new Error('Home Assistant history returned HTTP ' + res.status);
+      return res.json();
+    }).then(function (groups) {
+      var list = (Array.isArray(groups) && Array.isArray(groups[0])) ? groups[0] : [];
+      var points = [];
+      list.forEach(function (item) {
+        var value = Number(item && item.state);
+        if (!isFinite(value)) return;
+        var stamp = (item && (item.last_changed || item.last_updated)) || '';
+        var time = new Date(stamp);
+        if (isNaN(time.getTime())) return;
+        points.push({ t: time, v: value });
+      });
+      points.sort(function (a, b) { return a.t - b.t; });
+      return points;
+    });
   };
 
   HA.prototype.dashboard = function (id) {

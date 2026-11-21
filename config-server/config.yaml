@@ -1,7 +1,7 @@
 name: Aurora TV Configuration
-version: "1.0.0"
+version: "1.1.0"
 slug: aurora_config
-description: Central configuration UI and JSON API for Aurora TV launchers
+description: Central Aurora TV configuration and UK Freeview XMLTV guide
 arch:
   - aarch64
   - amd64
@@ -13,14 +13,23 @@ ingress: true
 ingress_port: 8090
 panel_icon: mdi:television-guide
 panel_title: Aurora TV
+webui: "http://[HOST]:[PORT:8090]/"
 ports:
   "8090/tcp": 8090
 ports_description:
-  "8090/tcp": Aurora configuration UI and TV API
+  "8090/tcp": Aurora UI, TV config API and the /epg.xml Freeview guide
 options:
   config_token: ""
   public_url: ""
+  epg_region: uk
+  epg_source_url: "https://raw.githubusercontent.com/dp247/Freeview-EPG/master/epg.xml"
+  epg_lcn_url: "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_DTT_channels_in_the_United_Kingdom&prop=wikitext&format=json&origin=*"
+  epg_refresh_minutes: 60
 schema:
   config_token: str?
   public_url: str?
+  epg_region: list(uk|uk-london|uk-scotland|uk-wales|uk-northern-ireland)
+  epg_source_url: url
+  epg_lcn_url: url
+  epg_refresh_minutes: int(1,1440)
 watchdog: "http://[HOST]:[PORT:8090]/api/health"

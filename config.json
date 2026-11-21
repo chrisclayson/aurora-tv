@@ -4,7 +4,7 @@
   "model": "",
   "ha": {
     "enabled": false,
-    "baseUrl": "",
+    "baseUrl": "http://homeassistant.local:8123",
     "token": "",
     "tvEntity": "",
     "lightEntity": "",
@@ -17,13 +17,18 @@
       }
     ],
     "currentPage": "home",
-    "musicEntity": ""
+    "musicEntity": "",
+    "climateEntity": "",
+    "weatherEntity": "",
+    "gasEntity": ""
   },
   "epg": {
-    "xmltvUrl": "",
+    "xmltvUrl": "http://homeassistant.local:8090/epg.xml",
     "demo": true,
     "refreshMinutes": 60,
-    "horizonHours": 3
+    "horizonHours": 3,
+    "nativeGuide": false,
+    "nativeGuideAppId": ""
   },
   "sources": {
     "hdmi1": {
@@ -64,7 +69,8 @@
   "ui": {
     "lastExternal": "livetv",
     "dashboardDuration": 30,
-    "overlayTimeoutMs": 3500
+    "overlayTimeoutMs": 3500,
+    "festiveMode": "auto"
   },
   "remoteConfig": {
     "enabled": false,
@@ -75,5 +81,8 @@
   "localServer": {
     "enabled": true,
     "token": ""
+  },
+  "apps": {
+    "items": []
   }
 }

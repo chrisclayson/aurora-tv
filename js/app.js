@@ -10,6 +10,13 @@
     tileIndex: 0,
     tiles: [],
     focusTileId: '',
+    homeRegion: 'tiles',
+    sensorIndex: 0,
+    sensorPress: null,
+    apps: { open: false, index: 0, focusId: '' },
+    appCatalog: { items: [], updated: 0, loading: false },
+    notifications: { index: 0 },
+    appPicker: { items: [], index: 0, loading: false, error: '', selectedId: '', mode: 'apps', path: '', title: '' },
     lastExternal: 'livetv',
     currentSource: '',
     sourceChangedAt: 0,
@@ -17,6 +24,11 @@
     backgrounded: false,
     currentChannel: null,
     channelTimer: null,
+    calendar: { events: [], loading: false, error: '', updated: 0, lastAttempt: 0, available: false },
+    calendarTimer: null,
+    weather: { forecast: [], loading: false, error: '', updated: 0, lastAttempt: 0, available: false },
+    weatherTimer: null,
+    haKey: '',
     haDashboard: '',
     haTemp: null,
     haOverlayTimer: null,
@@ -50,6 +62,7 @@
       dirty: false
     },
     savedLabel: '',
+    festiveKey: '',
     picker: {
       path: '',
       label: '',
@@ -407,6 +420,17 @@
       accent: 'indigo'
     });
 
+    if (conf.apps && conf.apps.items && conf.apps.items.length) {
+      tiles.push({
+        id: 'apps',
+        kind: 'APPS',
+        label: 'Apps',
+        sub: conf.apps.items.length + (conf.apps.items.length === 1 ? ' app' : ' apps') + ' · ' + conf.apps.items[0].name,
+        icon: 'apps',
+        accent: 'violet'
+      });
+    }
+
     tiles.push({
       id: 'ha',
       kind: 'HOME',
@@ -452,6 +476,26 @@
     });
 
     tiles.push({
+      id: 'samsunghub',
+      kind: 'SAMSUNG',
+      label: 'Samsung Hub',
+      sub: 'Apps, sources and TV',
+      icon: 'dashboard',
+      accent: 'indigo'
+    });
+
+    if (artModeAvailable()) {
+      tiles.push({
+        id: 'artmode',
+        kind: 'FRAME',
+        label: 'Art Mode',
+        sub: 'Show artwork on the Frame',
+        icon: 'palette',
+        accent: 'teal'
+      });
+    }
+
+    tiles.push({
       id: 'tvsettings',
       kind: 'TV',
       label: 'TV Settings',
@@ -463,26 +507,296 @@
     return tiles;
   }
 
+  function appIcon(app) {
+    var text = String((app && (app.name + ' ' + app.id)) || '').toLowerCase();
+    if (/music|spotify|tidal|deezer|tunein|radio/.test(text)) return 'music';
+    if (/guide|epg/.test(text)) return 'guide';
+    if (/browser|internet/.test(text)) return 'wifi';
+    if (/camera|security/.test(text)) return 'camera';
+    return 'play';
+  }
+
+  function ensureAppCatalog() {
+    var conf = cfg();
+    var apps = (conf.apps && conf.apps.items) || [];
+    if ((!apps.length && !conf.epg.nativeGuideAppId) || state.appCatalog.loading) return;
+    if (state.appCatalog.updated && Date.now() - state.appCatalog.updated < 5 * 60 * 1000) return;
+    state.appCatalog.loading = true;
+    A.Platform.listApps().then(function (items) {
+      state.appCatalog.items = items || [];
+      state.appCatalog.updated = Date.now();
+      state.appCatalog.loading = false;
+      if (state.screen === 'home') renderHome();
+      else if (state.screen === 'settings' && !A.UI.modalOpen()) renderSettingsScreen();
+    }).catch(function () {
+      state.appCatalog.loading = false;
+      state.appCatalog.updated = Date.now();
+    });
+  }
+
+  function nativeGuideAppName(id) {
+    if (!id) return '';
+    var name = '';
+    [state.appCatalog.items, state.appPicker.installed].forEach(function (list) {
+      (list || []).forEach(function (app) {
+        if (!name && app && app.id === id) name = app.name || id;
+      });
+    });
+    return name || id;
+  }
+
+  function appList() {
+    var items = (cfg().apps && cfg().apps.items) || [];
+    var catalog = {};
+    (state.appCatalog.items || []).forEach(function (item) { catalog[item.id] = item; });
+    return items.map(function (app, index) {
+      var installed = catalog[app.id];
+      return {
+        id: app.id,
+        name: app.name,
+        icon: installed ? installed.icon : '',
+        iconName: appIcon(app),
+        index: index
+      };
+    });
+  }
+
+  function notificationCount() {
+    return A.HA.configured && A.HA.notificationList ? A.HA.notificationList().length : 0;
+  }
+
+  function festiveMode() {
+    return cfg().ui.festiveMode || 'auto';
+  }
+
+  function festiveActive(date) {
+    var mode = festiveMode();
+    if (mode === 'on') return true;
+    if (mode === 'off') return false;
+    var d = date || new Date();
+    var month = d.getMonth();
+    var day = d.getDate();
+    return (month === 11 && day >= 1) || (month === 0 && day <= 6);
+  }
+
+  function festiveTag(date) {
+    var d = date || new Date();
+    if (d.getMonth() === 0 && d.getDate() <= 6) return '❄ HAPPY NEW YEAR';
+    return '❄ MERRY CHRISTMAS';
+  }
+
+  function isChristmasDay(date) {
+    var d = date || new Date();
+    return d.getMonth() === 11 && d.getDate() === 25;
+  }
+
+  function christmasCountdown(date) {
+    var d = date || new Date();
+    if (!festiveActive(d) || d.getMonth() === 0 || isChristmasDay(d)) return '';
+    var christmas = new Date(d.getFullYear(), 11, 25);
+    var days = Math.ceil((christmas.getTime() - d.getTime()) / 86400000);
+    if (days <= 0) return '';
+    return days + (days === 1 ? ' more sleep' : ' more sleeps') + ' 🎁';
+  }
+
+  function buildFairyLights() {
+    var host = q('#fairy-lights');
+    if (!host || host.childElementCount) return;
+    var colors = ['#ff4d5a', '#ffd166', '#3ddc84'];
+    for (var i = 0; i < 28; i++) {
+      var bulb = document.createElement('span');
+      bulb.className = 'fairy-bulb';
+      bulb.style.left = (((i + 0.5) / 28) * 100).toFixed(2) + '%';
+      bulb.style.top = (2 + (i % 3)) + 'px';
+      bulb.style.setProperty('--bulb', colors[i % colors.length]);
+      bulb.style.animationDelay = (-(i % 8) * 0.37).toFixed(2) + 's';
+      host.appendChild(bulb);
+    }
+  }
+
+  function updateFestiveChrome() {
+    var countdown = q('#christmas-countdown');
+    if (!countdown) return;
+    var text = christmasCountdown();
+    countdown.textContent = text;
+    countdown.hidden = !text;
+  }
+
+  var SNOWFLAKE_SVGS = [
+    '<path d="M32 4v56M7.8 18l48.4 28M7.8 46l48.4-28"/>' +
+      '<path d="M32 14l-6-6M32 14l6-6M32 50l-6 6M32 50l6 6"/>' +
+      '<path d="M15 22l-2-8M15 22l8-2M49 42l2 8M49 42l-8 2"/>' +
+      '<path d="M49 22l2-8M49 22l-8-2M15 42l-2 8M15 42l8 2"/>',
+    '<path d="M32 6v52M10 19l44 26M10 45l44-26"/>' +
+      '<path d="M32 16l-5-5M32 16l5-5M32 48l-5 5M32 48l5 5"/>' +
+      '<path d="M18 24l-7-1M18 24l-1-7M46 40l7 1M46 40l1 7"/>' +
+      '<path d="M46 24l7-1M46 24l1-7M18 40l-7 1M18 40l-1 7"/>' +
+      '<circle cx="32" cy="32" r="3" fill="currentColor" stroke="none"/>',
+    '<path d="M32 4v56M4 32h56M12 12l40 40M52 12L12 52"/>' +
+      '<path d="M32 12l-5-5M32 12l5-5M32 52l-5 5M32 52l5 5"/>' +
+      '<circle cx="32" cy="32" r="4" fill="currentColor" stroke="none"/>'
+  ];
+
+  function snowflakeSvg(index) {
+    return '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">' +
+      SNOWFLAKE_SVGS[index % SNOWFLAKE_SVGS.length] + '</svg>';
+  }
+
+  function buildFestiveSnow() {
+    var host = q('#festive-snow');
+    if (!host || host.childElementCount) return;
+    for (var i = 0; i < 36; i++) {
+      var flake = document.createElement('span');
+      var size = 3 + ((i * 7) % 5);
+      flake.className = 'snowflake';
+      flake.style.left = ((i * 37) % 100) + '%';
+      flake.style.width = size + 'px';
+      flake.style.height = size + 'px';
+      flake.style.animationDuration = (13 + (i % 9) * 2.3).toFixed(1) + 's';
+      flake.style.animationDelay = (-(i * 1.9)).toFixed(1) + 's';
+      flake.style.opacity = (0.26 + ((i * 11) % 40) / 100).toFixed(2);
+      host.appendChild(flake);
+    }
+    for (var j = 0; j < 9; j++) {
+      var large = document.createElement('span');
+      var largeSize = 17 + ((j * 13) % 24);
+      large.className = 'snowflake snowflake-large';
+      large.style.left = ((j * 29 + 9) % 94) + '%';
+      large.style.width = largeSize + 'px';
+      large.style.height = largeSize + 'px';
+      large.style.animationDuration = (20 + (j % 7) * 2.9).toFixed(1) + 's';
+      large.style.animationDelay = (-(j * 2.7)).toFixed(1) + 's';
+      large.style.opacity = (0.28 + ((j * 7) % 24) / 100).toFixed(2);
+      large.innerHTML = snowflakeSvg(j);
+      host.appendChild(large);
+    }
+  }
+
+  function applyFestiveMode(force, quiet) {
+    var now = new Date();
+    var key = now.toDateString() + '|' + festiveMode();
+    if (!force && state.festiveKey === key) return festiveActive(now);
+    state.festiveKey = key;
+    var active = festiveActive(now);
+    document.body.classList.toggle('festive', active);
+    var layer = q('#festive-layer');
+    if (layer) {
+      layer.hidden = !active;
+      if (active) {
+        buildFestiveSnow();
+        buildFairyLights();
+      }
+    }
+    updateFestiveChrome();
+    if (active && !quiet && state.screen === 'home') updateHomeChrome();
+    return active;
+  }
+
+  function artModeAvailable() {
+    var model = String((A.Platform.info && A.Platform.info.model) || cfg().model || '').toUpperCase();
+    return /LS03/.test(model);
+  }
+
+  function openArtMode() {
+    if (!artModeAvailable()) {
+      A.UI.toast('Art Mode is not supported on this TV', 'error', 3200);
+      return;
+    }
+    if (!A.Platform.caps.appLaunch) {
+      A.UI.toast('Preview — Art Mode would open', 'ok', 3200);
+      return;
+    }
+    A.UI.toast('Opening Art Mode', '', 1600);
+    return A.Platform.hideLivePreview().then(function () {
+      return A.Platform.launchArtMode();
+    }).catch(function (err) {
+      A.UI.toast('Could not open Art Mode: ' + err.message, 'error', 4500);
+    });
+  }
+
+  function onModelReady() {
+    if (state.screen === 'home') renderHome();
+  }
+
+  function renderHomeNotifications() {
+    var button = q('#home-notify');
+    if (!button) return false;
+    var list = A.HA.configured && A.HA.notificationList ? A.HA.notificationList() : [];
+    var count = list.length;
+    if (!count) {
+      if (state.homeRegion === 'notifications') state.homeRegion = 'tiles';
+      return false;
+    }
+    var icon = q('#home-notify-icon');
+    var badge = q('#home-notify-badge');
+    if (icon && !icon.firstChild) icon.innerHTML = A.UI.icon('bell');
+    if (badge) badge.textContent = count > 99 ? '99+' : String(count);
+    return true;
+  }
+
   function renderHome() {
+    ensureAppCatalog();
     state.tiles = buildTiles();
     if (state.tileIndex >= state.tiles.length) state.tileIndex = 0;
     if (state.focusTileId) state.tileIndex = tileIndexById(state.focusTileId);
     var focusId = state.tiles[state.tileIndex] ? state.tiles[state.tileIndex].id : 'hdmi1';
 
+    updateFestiveChrome();
+    var notifyVisible = renderHomeNotifications();
+    var button = q('#home-notify');
+    if (button) button.hidden = !notifyVisible;
+    if (!notifyVisible && state.homeRegion === 'notifications') state.homeRegion = 'tiles';
+
+    var sensors = A.HA.sensors();
+    if (state.homeRegion === 'sensors') {
+      var sensorCount = sensorList().length;
+      if (!sensorCount) state.homeRegion = 'tiles';
+      else state.sensorIndex = U.clamp(state.sensorIndex, 0, sensorCount - 1);
+    }
+
+    var apps = appList();
+    if (state.apps.open && !apps.length) state.apps.open = false;
+    if (state.apps.open) {
+      state.apps.index = U.clamp(state.apps.index, 0, Math.max(0, apps.length - 1));
+      state.apps.focusId = apps[state.apps.index] ? apps[state.apps.index].id : '';
+    }
+
     A.UI.renderHome({
       now: new Date(),
       subtitle: homeSubtitle(),
       tiles: state.tiles,
-      sensors: A.HA.sensors(),
+      sensors: sensors,
+      sensorIndex: state.sensorIndex,
       status: statusModel(),
+      weather: weatherModel(),
+      calendar: state.calendar,
       focusId: focusId,
+      greeting: festiveActive() && isChristmasDay() ? 'Merry Christmas' : '',
+      festiveTag: festiveActive() ? festiveTag() : '',
+      focusRegion: state.apps.open ? 'apps' : state.homeRegion,
+      appsOpen: state.apps.open,
+      apps: apps,
+      appFocusId: state.apps.focusId,
       onTile: activateTile,
       onHover: function (id) {
+        if (state.apps.open) return;
         state.tileIndex = tileIndexById(id);
         state.focusTileId = id;
+        state.homeRegion = 'tiles';
+      },
+      onSensor: activateSensor,
+      onSensorHover: function (index) {
+        state.homeRegion = 'sensors';
+        state.sensorIndex = index;
+      },
+      onApp: launchAppItem,
+      onAppHover: function (id) {
+        state.homeRegion = 'apps';
+        state.apps.index = Math.max(0, apps.map(function (app) { return app.id; }).indexOf(id));
+        state.apps.focusId = id;
       }
     });
-    A.UI.applyFocus(focusId);
   }
 
   function updateHomeChrome() {
@@ -490,11 +804,171 @@
     var sub = q('#home-sub');
     if (sub) sub.textContent = homeSubtitle();
     var title = q('#home-title');
-    if (title) title.textContent = A.UI.greeting(new Date());
+    if (title) {
+      title.textContent = festiveActive() && isChristmasDay()
+        ? 'Merry Christmas'
+        : A.UI.greeting(new Date());
+    }
+    updateFestiveChrome();
     var date = q('#home-date');
-    if (date) date.textContent = U.fmtDate(new Date()).toUpperCase();
-    A.UI.renderSensors(A.HA.sensors());
+    if (date) {
+      date.textContent = U.fmtDate(new Date()).toUpperCase() +
+        (festiveActive() ? ' · ' + festiveTag() : '');
+    }
+    renderSensorsHome();
     A.UI.renderStatus(statusModel());
+    A.UI.renderWeather(weatherModel());
+    var notifyVisible = renderHomeNotifications();
+    var notifyButton = q('#home-notify');
+    if (notifyButton) notifyButton.hidden = !notifyVisible;
+    if (!notifyVisible && state.homeRegion === 'notifications') {
+      state.homeRegion = 'tiles';
+    }
+  }
+
+  function sensorList() {
+    var sensors = A.HA.sensors();
+    var list = [];
+    if (sensors.climate && sensors.climate.current != null) {
+      list.push({ kind: 'climate', label: 'Temperature', entityId: sensors.climate.id, data: sensors.climate });
+    }
+    if (sensors.light) {
+      list.push({ kind: 'light', label: 'Lights', entityId: sensors.light.id, data: sensors.light });
+    }
+    if (sensors.power) {
+      list.push({ kind: 'power', label: 'Electricity Usage', entityId: sensors.power.id, data: sensors.power });
+    }
+    if (sensors.gas) {
+      list.push({ kind: 'gas', label: 'Gas Usage', entityId: sensors.gas.id, data: sensors.gas });
+    }
+    return list;
+  }
+
+  function renderSensorsHome() {
+    var list = sensorList();
+    if (state.homeRegion === 'sensors') {
+      if (!list.length) state.homeRegion = 'tiles';
+      else state.sensorIndex = U.clamp(state.sensorIndex, 0, list.length - 1);
+    }
+    A.UI.renderSensors(A.HA.sensors(), {
+      focus: state.homeRegion === 'sensors' ? state.sensorIndex : -1,
+      onSensor: activateSensor,
+      onHover: function (index) {
+        state.homeRegion = 'sensors';
+        state.sensorIndex = index;
+      }
+    });
+  }
+
+  function focusSensors() {
+    if (!sensorList().length) return;
+    state.homeRegion = 'sensors';
+    state.sensorIndex = U.clamp(state.sensorIndex, 0, sensorList().length - 1);
+    renderHome();
+  }
+
+  function moveSensor(delta) {
+    var list = sensorList();
+    if (!list.length) return;
+    cancelSensorPress();
+    state.sensorIndex = (state.sensorIndex + delta + list.length) % list.length;
+    state.homeRegion = 'sensors';
+    A.UI.renderSensors(A.HA.sensors(), {
+      focus: state.sensorIndex,
+      onSensor: activateSensor,
+      onHover: function (index) { state.sensorIndex = index; }
+    });
+    A.UI.applySensorFocus(state.sensorIndex, true);
+  }
+
+  function cancelSensorPress() {
+    if (state.sensorPress) {
+      clearTimeout(state.sensorPress.timer);
+      state.sensorPress = null;
+    }
+  }
+
+  function beginSensorPress(index) {
+    cancelSensorPress();
+    var item = sensorList()[index];
+    if (!item) return;
+    var press = { index: index, long: false, timer: null };
+    if (item.kind === 'climate' || item.kind === 'light') {
+      press.timer = setTimeout(function () {
+        if (state.sensorPress !== press) return;
+        press.long = true;
+        if (A.HANative && A.HANative.openDetailForEntity) {
+          A.HANative.openDetailForEntity(item.entityId, 'home');
+        }
+      }, 650);
+    }
+    state.sensorPress = press;
+  }
+
+  function sensorKeyUp(code) {
+    if (code !== 13 || !state.sensorPress) return false;
+    var press = state.sensorPress;
+    clearTimeout(press.timer);
+    state.sensorPress = null;
+    if (!press.long) activateSensor(press.index);
+    return true;
+  }
+
+  function activateSensor(index) {
+    var item = sensorList()[index];
+    if (!item) return;
+    if (item.kind === 'climate' || item.kind === 'light') {
+      if (A.HANative && A.HANative.toggleEntity) A.HANative.toggleEntity(item.entityId);
+      return;
+    }
+    openEnergyGraph(item);
+  }
+
+  function openEnergyGraph(item) {
+    if (!A.HA.history) {
+      A.UI.toast('Energy history is not available', 'error', 3000);
+      return;
+    }
+    A.UI.toast('Loading 24-hour usage…', '', 1400);
+    A.HA.history(item.entityId, 24).then(function (points) {
+      if (!points.length) {
+        A.UI.toast('No history available for ' + item.label, 'error', 3000);
+        return;
+      }
+      var deviceClass = String((item.data && item.data.device_class) || '').toLowerCase();
+      var cumulative = deviceClass === 'energy' || deviceClass === 'gas';
+      var chart = points;
+      if (cumulative && points.length > 1) {
+        var deltas = [];
+        for (var i = 1; i < points.length; i++) {
+          var diff = points[i].v - points[i - 1].v;
+          if (isFinite(diff) && diff >= 0) deltas.push({ t: points[i].t, v: diff });
+        }
+        if (deltas.length > 1) chart = deltas;
+      }
+      var latest = chart[chart.length - 1];
+      var summaryValue;
+      var summaryLabel;
+      if (cumulative) {
+        var total = chart.reduce(function (sum, point) { return sum + point.v; }, 0);
+        summaryValue = (Math.round(total * 100) / 100) + ((item.data.unit ? ' ' + item.data.unit : ''));
+        summaryLabel = 'Usage';
+      } else {
+        summaryValue = latest.v + ((item.data.unit ? ' ' + item.data.unit : ''));
+        summaryLabel = 'Latest';
+      }
+      A.UI.energyGraph({
+        title: item.label,
+        subtitle: 'Last 24 hours',
+        points: chart,
+        unit: (item.data && item.data.unit) || '',
+        summaryLabel: summaryLabel,
+        summaryValue: summaryValue,
+        color: item.kind === 'gas' ? '#fbbf24' : '#60a5fa'
+      });
+    }).catch(function (err) {
+      A.UI.toast('Could not load ' + item.label + ': ' + err.message, 'error', 4500);
+    });
   }
 
   function moveTile(delta) {
@@ -505,15 +979,210 @@
     updateHomeChrome();
   }
 
+  function moveApp(delta) {
+    var apps = cfg().apps.items || [];
+    if (!apps.length) return;
+    state.apps.index = (state.apps.index + delta + apps.length) % apps.length;
+    state.apps.focusId = apps[state.apps.index].id;
+    state.homeRegion = 'apps';
+    A.UI.applyFocus(state.apps.focusId, true, 'app');
+  }
+
+  function openAppsRow() {
+    var apps = cfg().apps.items || [];
+    if (!apps.length) return;
+    state.apps.open = true;
+    state.apps.index = 0;
+    state.apps.focusId = apps[0].id;
+    state.homeRegion = 'apps';
+    renderHome();
+  }
+
+  function closeAppsRow() {
+    if (!state.apps.open) return;
+    state.apps.open = false;
+    state.homeRegion = 'tiles';
+    state.focusTileId = 'apps';
+    state.tileIndex = tileIndexById('apps');
+    renderHome();
+  }
+
+  function launchAppItem(id) {
+    var apps = cfg().apps.items || [];
+    var app = null;
+    apps.forEach(function (item) { if (item.id === id) app = item; });
+    if (!app) return;
+    if (!A.Platform.caps.appLaunch) {
+      A.UI.toast('Preview — ' + app.name + ' would open', 'ok', 3200);
+      return;
+    }
+    A.UI.toast('Opening ' + app.name, '', 1600);
+    return A.Platform.hideLivePreview().then(function () {
+      return A.Platform.launchApp(app.id);
+    }).catch(function (err) {
+      A.UI.toast('Could not open ' + app.name + ': ' + err.message, 'error', 5000);
+    });
+  }
+
+  function focusNotifications() {
+    if (!notificationCount()) return;
+    state.homeRegion = 'notifications';
+    state.apps.open = false;
+    renderHome();
+  }
+
+  function focusTiles() {
+    state.homeRegion = 'tiles';
+    renderHome();
+  }
+
+  function notificationLabel(item, index) {
+    return item && item.title ? item.title : ('Notification ' + (index + 1));
+  }
+
+  function notificationTime(value) {
+    var date = new Date(value);
+    if (isNaN(date.getTime())) return '';
+    var today = new Date();
+    if (date.toDateString() === today.toDateString()) return U.fmtTime(date);
+    return U.fmtDateShort(date) + ' · ' + U.fmtTime(date);
+  }
+
+  function renderNotifications() {
+    var list = A.HA.notificationList ? A.HA.notificationList() : [];
+    var host = q('#notifications-list');
+    var status = q('#notifications-status');
+    if (status) {
+      status.textContent = list.length + (list.length === 1 ? ' notification' : ' notifications');
+    }
+    if (!host) return;
+    state.notifications.index = U.clamp(state.notifications.index, 0, Math.max(0, list.length));
+    var html = list.map(function (item, index) {
+      return '<button type="button" class="notification-item' +
+        (index === state.notifications.index ? ' focused' : '') +
+        '" data-notification-index="' + index + '">' +
+        '<span class="notification-icon">' + A.UI.icon('bell') + '</span>' +
+        '<span class="notification-main">' +
+        '<span class="notification-title">' + U.esc(item.title || 'Notification') + '</span>' +
+        '<span class="notification-message">' + U.esc(item.message || '') + '</span>' +
+        '</span>' +
+        '<span class="notification-time">' + U.esc(notificationTime(item.created_at)) + '</span>' +
+        '</button>';
+    }).join('');
+    if (list.length) {
+      html += '<button type="button" class="notification-item notification-all' +
+        (state.notifications.index === list.length ? ' focused' : '') +
+        '" data-notification-all="1">' +
+        '<span class="notification-icon">' + A.UI.icon('close') + '</span>' +
+        '<span class="notification-main"><span class="notification-title">Dismiss all notifications</span>' +
+        '<span class="notification-message">Clear every notification from Home Assistant</span></span>' +
+        '</button>';
+    } else {
+      html = '<div class="notifications-empty"><span class="ha-empty-title">No notifications</span>' +
+        '<span class="ha-empty-sub">Home Assistant persistent notifications appear here.</span></div>';
+    }
+    host.innerHTML = html;
+    var node = host.querySelector('.notification-item.focused');
+    if (node) {
+      try { node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {
+        try { node.scrollIntoView(); } catch (err) { /* ignore */ }
+      }
+    }
+  }
+
+  function openNotifications() {
+    var list = A.HA.notificationList ? A.HA.notificationList() : [];
+    if (!list.length) return;
+    state.screen = 'notifications';
+    state.notifications.index = 0;
+    A.UI.showScreen('notifications');
+    renderNotifications();
+    if (A.HA.refreshNotifications) A.HA.refreshNotifications().catch(function () { /* ignore */ });
+  }
+
+  function closeNotifications() {
+    showHome();
+    state.homeRegion = 'tiles';
+    renderHome();
+  }
+
+  function dismissNotificationAt(index) {
+    var list = A.HA.notificationList ? A.HA.notificationList() : [];
+    if (index >= list.length) {
+      if (!list.length) return;
+      A.HA.dismissAllNotifications().then(function () {
+        A.UI.toast('Notifications dismissed', 'ok', 1800);
+        closeNotifications();
+      }).catch(function (err) {
+        A.UI.toast('Could not dismiss notifications: ' + err.message, 'error', 4500);
+      });
+      return;
+    }
+    var item = list[index];
+    if (!item || !item.notification_id) return;
+    A.HA.dismissNotification(item.notification_id).then(function () {
+      if (!notificationCount()) {
+        closeNotifications();
+        return;
+      }
+      state.notifications.index = U.clamp(state.notifications.index, 0, notificationCount() - 1);
+      renderNotifications();
+    }).catch(function (err) {
+      A.UI.toast('Could not dismiss notification: ' + err.message, 'error', 4500);
+      renderNotifications();
+    });
+  }
+
+  function notificationsKey(code) {
+    var list = A.HA.notificationList ? A.HA.notificationList() : [];
+    if (code === 10009 || code === 27) {
+      closeNotifications();
+      return true;
+    }
+    if (!list.length) {
+      if (code === 13) closeNotifications();
+      return true;
+    }
+    if (code === 40) {
+      state.notifications.index = U.clamp(state.notifications.index + 1, 0, list.length);
+      renderNotifications();
+      return true;
+    }
+    if (code === 38) {
+      state.notifications.index = U.clamp(state.notifications.index - 1, 0, list.length);
+      renderNotifications();
+      return true;
+    }
+    if (code === 13) {
+      dismissNotificationAt(state.notifications.index);
+      return true;
+    }
+    if (code === 406) {
+      if (list.length) {
+        A.HA.dismissAllNotifications().then(function () {
+          A.UI.toast('Notifications dismissed', 'ok', 1800);
+          closeNotifications();
+        }).catch(function (err) {
+          A.UI.toast('Could not dismiss notifications: ' + err.message, 'error', 4500);
+        });
+      }
+      return true;
+    }
+    return false;
+  }
+
   function isInputTile(id) {
     return id === 'livetv' || /^hdmi[1-4]$/.test(String(id));
   }
 
   function activateTile(id) {
     if (id === 'guide') return openGuide();
+    if (id === 'apps') return openAppsRow();
     if (id === 'ha') return A.HANative.open();
     if (id === 'music') return A.HANative.openMusic();
     if (id === 'cameras') return A.HANative.openCameras();
+    if (id === 'samsunghub') return openSamsungHub();
+    if (id === 'artmode') return openArtMode();
     if (id === 'tvsettings') return openTvSettings();
     if (id === 'settings') return openSettings();
     if (isInputTile(id)) {
@@ -549,11 +1218,20 @@
     state.screen = 'home';
     state.backgrounded = false;
     state.focusTileId = '';
+    state.homeRegion = 'tiles';
+    state.apps.open = false;
+    state.apps.index = 0;
+    state.apps.focusId = '';
+    cancelSensorPress();
+    state.sensorIndex = 0;
+    applyFestiveMode(false, true);
     if (state.remote.pending) applyPendingRemote();
     A.UI.showScreen('home');
     renderHome();
     updateLivePreview();
     refreshCurrentSource();
+    loadCalendarIfStale();
+    loadWeatherIfStale();
   }
 
   /* ---------- source switching ---------- */
@@ -669,9 +1347,13 @@
     };
 
     // Prefer the channel we are currently watching, then the first programme on air.
-    if (state.currentChannel && state.currentChannel.name) {
+    if (state.currentChannel) {
+      var currentNumber = String(state.currentChannel.number || '').replace(/\.0+$/, '');
+      var currentName = String(state.currentChannel.name || '').toLowerCase();
       channels.forEach(function (channel, index) {
-        if (String(channel.name).toLowerCase() === String(state.currentChannel.name).toLowerCase()) {
+        if (currentNumber && String(channel.number || '').replace(/\.0+$/, '') === currentNumber) {
+          guide.channelIndex = index;
+        } else if (currentName && String(channel.name).toLowerCase() === currentName) {
           guide.channelIndex = index;
         }
       });
@@ -756,6 +1438,74 @@
   }
 
   function openGuide() {
+    if (cfg().epg.nativeGuide) {
+      openNativeGuide().catch(function (err) {
+        A.UI.toast('Could not open the native TV Guide: ' + err.message, 'error', 4500);
+        openXmltvGuide();
+      });
+      return;
+    }
+    openXmltvGuide();
+  }
+
+  function openNativeGuide() {
+    var conf = cfg();
+    var appId = String(conf.epg.nativeGuideAppId || (conf.livetv && conf.livetv.guideAppId) || '').trim();
+    A.UI.toast('Opening TV Guide', '', 1600);
+    function launch(id) {
+      return A.Platform.hideLivePreview().then(function () {
+        return A.Platform.launchApp(id);
+      });
+    }
+    if (appId) {
+      if (!A.Platform.caps.appLaunch) {
+        A.UI.toast('Preview — native TV Guide (' + appId + ') would open', 'ok', 3200);
+        return Promise.resolve(false);
+      }
+      return launch(appId);
+    }
+    if (!A.Platform.caps.appLaunch) {
+      A.UI.toast('Preview — the native TV Guide app would open', 'ok', 3200);
+      return Promise.resolve(false);
+    }
+    return A.Platform.listApps().then(function (apps) {
+      var found = null;
+      var preferred = [
+        'com.samsung.tv.coba.epg',
+        'org.tizen.epg',
+        'com.samsung.tv.guide',
+        'com.samsung.tv.tvguide',
+        '111477000794'
+      ];
+      preferred.forEach(function (id) {
+        if (found) return;
+        apps.forEach(function (app) { if (app.id === id) found = app; });
+      });
+      if (!found) {
+        apps.forEach(function (app) {
+          if (found) return;
+          var name = String(app.name || '').trim();
+          if (/(^|[.\-_])epg($|[.\-_])/i.test(app.id) ||
+              /^(tv|program(me)?) guide$/i.test(name)) {
+            found = app;
+          }
+        });
+      }
+      if (found) return launch(found.id);
+      // Some TVs hide the system guide from getAppsInfo; try the known IDs.
+      function attempt(index) {
+        if (index >= preferred.length) {
+          throw new Error('No guide app found. Set its app ID in Settings.');
+        }
+        return launch(preferred[index]).catch(function () {
+          return attempt(index + 1);
+        });
+      }
+      return attempt(0);
+    });
+  }
+
+  function openXmltvGuide() {
     state.screen = 'guide';
     state.guide = buildGuide();
     A.UI.showScreen('guide');
@@ -807,16 +1557,39 @@
     }
     A.UI.toast('Tuning to ' + channel.name + ' · ' + program.title, '', 2200);
     var source = A.EPG.data().source;
-    if (source === 'xmltv' && A.Platform.caps.tvchannel) {
-      A.Platform.tuneChannelNumber(channel.number).then(function () {
-        return A.Platform.switchSource('livetv');
-      }).catch(function () {
-        A.UI.toast('Tuning is not permitted on this TV — opening Live TV', 'error', 3500);
-        A.Platform.switchSource('livetv');
-      });
+
+    function revealLive() {
+      return A.Platform.switchSource('livetv');
+    }
+    function tuneHA() {
+      if (!A.HA.playChannel || !A.HA.canControlTv()) {
+        return Promise.reject(new Error('Home Assistant TV control is not configured'));
+      }
+      A.UI.toast('Tuning via Home Assistant…', '', 1600);
+      return A.HA.playChannel(channel.number).then(revealLive);
+    }
+    function tuneNative() {
+      if (!A.Platform.caps.tvchannel) {
+        return Promise.reject(new Error('Native tuning is not available'));
+      }
+      return A.Platform.tuneChannelNumber(channel.number).then(revealLive);
+    }
+    function openLiveInstead() {
+      A.UI.toast('Could not tune to ' + channel.name + ' — opening Live TV', 'error', 4000);
+      revealLive();
+    }
+
+    if (source === 'xmltv' && channel.number) {
+      // Prefer Home Assistant when it is configured: the public certificate on
+      // many retail TVs cannot use tizen.tvchannel.tune.
+      if (A.HA.playChannel && A.HA.canControlTv()) {
+        tuneHA().catch(tuneNative).catch(openLiveInstead);
+      } else {
+        tuneNative().catch(tuneHA).catch(openLiveInstead);
+      }
     } else {
       if (source === 'demo') A.UI.toast('Demo guide — opening Live TV', '', 2500);
-      A.Platform.switchSource('livetv');
+      revealLive();
     }
   }
 
@@ -1157,6 +1930,165 @@
     }).catch(function () { /* detection is best effort */ });
   }
 
+  function weatherModel() {
+    var id = cfg().ha.weatherEntity;
+    if (!id || !A.HA.configured) return { available: false, forecast: [] };
+    var entity = A.HA.entity(id);
+    var attrs = (entity && entity.attributes) || {};
+    var temperature = attrs.temperature == null || attrs.temperature === '' ? null : Number(attrs.temperature);
+    return {
+      available: true,
+      name: attrs.friendly_name || id,
+      condition: entity ? entity.state : '',
+      temperature: isFinite(temperature) ? temperature : null,
+      unit: attrs.temperature_unit || '°C',
+      forecast: state.weather.forecast || []
+    };
+  }
+
+  function loadWeather(force) {
+    var w = state.weather;
+    var id = cfg().ha.weatherEntity;
+    if (!A.HA.configured || !id) {
+      w.forecast = [];
+      w.loading = false;
+      w.error = '';
+      w.updated = 0;
+      w.available = false;
+      if (state.screen === 'home') A.UI.renderWeather(weatherModel());
+      return;
+    }
+    w.available = true;
+    if (w.loading && !force) return;
+    w.loading = true;
+    w.lastAttempt = Date.now();
+    A.HA.weatherForecast(3).then(function (forecast) {
+      w.loading = false;
+      w.error = '';
+      w.updated = Date.now();
+      w.forecast = forecast || [];
+      if (state.screen === 'home') A.UI.renderWeather(weatherModel());
+    }).catch(function (err) {
+      w.loading = false;
+      w.error = err.message || 'Weather forecast unavailable';
+      if (state.screen === 'home') A.UI.renderWeather(weatherModel());
+    });
+  }
+
+  function loadWeatherIfStale() {
+    var w = state.weather;
+    var id = cfg().ha.weatherEntity;
+    if (!A.HA.configured || !id) {
+      if (w.available || w.forecast.length || w.error) {
+        w.available = false;
+        w.forecast = [];
+        w.loading = false;
+        w.error = '';
+        w.updated = 0;
+        if (state.screen === 'home') A.UI.renderWeather(weatherModel());
+      }
+      return;
+    }
+    w.available = true;
+    if (w.updated && Date.now() - w.updated < 10 * 60000) return;
+    if (w.loading) return;
+    if (w.lastAttempt && Date.now() - w.lastAttempt < 60000) return;
+    loadWeather();
+  }
+
+  function calendarWindow() {
+    var now = new Date();
+    return {
+      now: now,
+      start: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      end: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3)
+    };
+  }
+
+  function loadCalendar(force) {
+    var c = state.calendar;
+    if (!A.HA.configured) {
+      c.events = [];
+      c.loading = false;
+      c.error = '';
+      c.updated = 0;
+      c.available = false;
+      if (state.screen === 'home') renderHome();
+      return;
+    }
+    if (!A.HA.calendars || !A.HA.calendars().length) {
+      c.events = [];
+      c.loading = false;
+      c.error = '';
+      c.available = false;
+      if (state.screen === 'home') renderHome();
+      return;
+    }
+    if (c.loading && !force) return;
+    c.available = true;
+    c.loading = true;
+    c.lastAttempt = Date.now();
+    var win = calendarWindow();
+    A.HA.calendarEvents(win.start, win.end).then(function (events) {
+      c.loading = false;
+      c.error = '';
+      c.updated = Date.now();
+      c.events = (events || []).filter(function (event) {
+        return event.end && event.end > win.now && event.start < win.end;
+      });
+      if (state.screen === 'home') renderHome();
+    }).catch(function (err) {
+      c.loading = false;
+      c.error = err.message || 'Calendar unavailable';
+      if (state.screen === 'home') renderHome();
+    });
+  }
+
+  function loadCalendarIfStale() {
+    var c = state.calendar;
+    if (!A.HA.configured) {
+      if (c.available || c.events.length || c.error) {
+        c.available = false;
+        c.events = [];
+        c.loading = false;
+        c.error = '';
+        c.updated = 0;
+        if (state.screen === 'home') renderHome();
+      }
+      return;
+    }
+    var calendars = A.HA.calendars ? A.HA.calendars() : [];
+    if (!calendars.length) {
+      if (c.available || c.events.length || c.error) {
+        c.available = false;
+        c.events = [];
+        c.loading = false;
+        c.error = '';
+        c.updated = 0;
+        if (state.screen === 'home') renderHome();
+      }
+      return;
+    }
+    c.available = true;
+    if (c.updated && Date.now() - c.updated < 5 * 60000) return;
+    if (c.loading) return;
+    if (c.lastAttempt && Date.now() - c.lastAttempt < 60000) return;
+    loadCalendar();
+  }
+
+  function openSamsungHub() {
+    if (!A.Platform.caps.appLaunch) {
+      A.UI.toast('Preview — Samsung Hub (com.samsung.tv.csfs) would open', 'ok', 4000);
+      return;
+    }
+    A.UI.toast('Opening Samsung Hub', '', 1600);
+    return A.Platform.hideLivePreview().then(function () {
+      return A.Platform.launchApp('com.samsung.tv.csfs');
+    }).catch(function (err) {
+      A.UI.toast('Could not open Samsung Hub: ' + err.message, 'error', 5000);
+    });
+  }
+
   /* ---------- native TV settings ---------- */
 
   function openTvSettings() {
@@ -1344,6 +2276,442 @@
     return false;
   }
 
+  /* ---------- apps picker ---------- */
+
+  function appMatchesQuery(app, query) {
+    if (!query) return true;
+    return (String(app.name || '') + ' ' + String(app.id || '')).toLowerCase().indexOf(query) !== -1;
+  }
+
+  function visibleInstalledApps(apps) {
+    return (apps || []).filter(function (app) {
+      if (!app || !app.id || !app.name) return false;
+      return app.show !== false;
+    });
+  }
+
+  function buildAppPickerItems() {
+    var draft = state.settings.draft;
+    var configured = draft && draft.apps && Array.isArray(draft.apps.items) ? draft.apps.items : [];
+    var installed = visibleInstalledApps(state.appPicker.installed);
+    var installedById = {};
+    installed.forEach(function (app) { installedById[app.id] = app; });
+    var query = String(state.appPicker.query || '').trim();
+    var needle = query.toLowerCase();
+    var mode = state.appPicker.mode || 'apps';
+    var items = [];
+    var seen = {};
+
+    items.push({
+      id: '',
+      special: 'search',
+      name: query ? 'Search: ' + query : 'Search apps by name…',
+      sub: query ? 'Press OK to change the search' : 'Filter installed apps by name or ID'
+    });
+    if (query) {
+      items.push({ id: '', special: 'clear-search', name: 'Clear search', sub: 'Show all installed apps' });
+    }
+
+    if (mode === 'select') {
+      var current = String(draft && draft.epg ? (draft.epg.nativeGuideAppId || '') : '');
+      items.push({
+        id: '',
+        special: 'automatic',
+        name: current ? 'Automatic (detect installed guide)' : 'Automatic (detected)',
+        sub: current ? 'Clear the selected app and detect automatically' : 'Uses the TV’s installed EPG app',
+        selected: !current
+      });
+      if (current && !installedById[current]) {
+        var currentItem = {
+          id: current,
+          name: nativeGuideAppName(current),
+          icon: '',
+          selected: true,
+          installed: false
+        };
+        if (appMatchesQuery(currentItem, needle)) items.push(currentItem);
+      }
+      installed.slice().sort(function (a, b) {
+        return String(a.name || a.id).localeCompare(String(b.name || b.id));
+      }).forEach(function (app) {
+        var item = {
+          id: app.id,
+          name: app.name || app.id,
+          icon: app.icon || '',
+          selected: app.id === current,
+          installed: true
+        };
+        if (appMatchesQuery(item, needle)) items.push(item);
+      });
+      return items;
+    }
+
+    configured.forEach(function (app) {
+      if (!app || !app.id || seen[app.id]) return;
+      seen[app.id] = true;
+      var installedApp = installedById[app.id];
+      var item = {
+        id: app.id,
+        name: app.name || (installedApp && installedApp.name) || app.id,
+        icon: (installedApp && installedApp.icon) || '',
+        enabled: true,
+        installed: !!installedApp
+      };
+      if (appMatchesQuery(item, needle)) items.push(item);
+    });
+
+    installed.slice().sort(function (a, b) {
+      return String(a.name || a.id).localeCompare(String(b.name || b.id));
+    }).forEach(function (app) {
+      if (seen[app.id]) return;
+      seen[app.id] = true;
+      var item = { id: app.id, name: app.name || app.id, icon: app.icon || '', enabled: false, installed: true };
+      if (appMatchesQuery(item, needle)) items.push(item);
+    });
+
+    items.push({ id: '', special: 'manual', name: 'Add app ID manually…', sub: 'For apps that are not listed' });
+    return items;
+  }
+
+  function appPickerFocus(id) {
+    var items = state.appPicker.items;
+    var index = 0;
+    items.forEach(function (item, i) { if (item.id && item.id === id) index = i; });
+    state.appPicker.index = U.clamp(index, 0, Math.max(0, items.length - 1));
+    state.appPicker.selectedId = id || '';
+  }
+
+  function focusFirstAppPickerResult() {
+    var items = state.appPicker.items;
+    var index = 0;
+    items.forEach(function (item, i) {
+      if (!index && item.id) index = i;
+    });
+    state.appPicker.index = index;
+  }
+
+  function appPickerIcon(item) {
+    if (item.special === 'search') {
+      return '<span class="app-picker-icon special">' + A.UI.icon('search') + '</span>';
+    }
+    if (item.special === 'clear-search') {
+      return '<span class="app-picker-icon special">' + A.UI.icon('close') + '</span>';
+    }
+    if (item.special === 'manual') {
+      return '<span class="app-picker-icon special">' + A.UI.icon('apps') + '</span>';
+    }
+    if (item.special === 'automatic') {
+      return '<span class="app-picker-icon special' + (item.selected ? ' selected' : '') + '">' +
+        A.UI.icon('guide') + '<span class="app-picker-check">✓</span></span>';
+    }
+    var source = A.UI.iconUrl(item.icon);
+    return '<span class="app-picker-icon' + (item.enabled ? ' enabled' : '') +
+      (item.selected ? ' selected' : '') + '">' +
+      '<span class="app-icon-glyph">' + A.UI.icon(appIcon(item)) + '</span>' +
+      (source ? '<img class="app-icon-img" src="' + U.esc(source) + '" alt="">' : '') +
+      '<span class="app-picker-check">✓</span>' +
+      '</span>';
+  }
+
+  function renderAppPicker() {
+    var picker = state.appPicker;
+    var status = q('#app-picker-status');
+    var host = q('#app-picker-list');
+    var empty = q('#app-picker-empty');
+    var draft = state.settings.draft || {};
+    var configured = draft.apps && Array.isArray(draft.apps.items) ? draft.apps.items : [];
+    var installed = visibleInstalledApps(picker.installed);
+    var selectMode = picker.mode === 'select';
+    var titleNode = q('#app-picker-title');
+    if (titleNode) titleNode.textContent = picker.title || (selectMode ? 'Native guide app' : 'Apps menu');
+    var reorderHint = q('#app-picker-reorder');
+    if (reorderHint) reorderHint.hidden = selectMode;
+    if (status) {
+      if (picker.loading) status.textContent = 'Loading installed apps…';
+      else if (picker.error) status.textContent = picker.error;
+      else if (selectMode) {
+        var currentId = draft.epg ? (draft.epg.nativeGuideAppId || '') : '';
+        status.textContent = (currentId ? 'Selected: ' + nativeGuideAppName(currentId) : 'Automatic selection') +
+          ' · ' + installed.length + ' installed' +
+          (picker.query ? ' · “' + picker.query + '”' : '');
+      } else {
+        var count = configured.length;
+        status.textContent = count + (count === 1 ? ' app enabled' : ' apps enabled') +
+          ' · ' + installed.length + ' installed' +
+          (picker.query ? ' · “' + picker.query + '”' : '');
+      }
+    }
+    if (empty) empty.hidden = !(picker.error && !(picker.items || []).length);
+    if (!host) return;
+    if (!picker.items.length) {
+      host.innerHTML = '';
+      return;
+    }
+    picker.index = U.clamp(picker.index, 0, picker.items.length - 1);
+    var html = picker.items.map(function (item, index) {
+      var cls = 'entity-picker-item app-picker-item' +
+        (index === picker.index ? ' focused' : '') +
+        (item.enabled ? ' enabled' : '') +
+        (item.selected ? ' selected' : '') +
+        (item.special ? ' special' : '');
+      var right = '';
+      if (item.special === 'search') right = '<span class="app-picker-state">Search</span>';
+      else if (item.special === 'clear-search') right = '<span class="app-picker-state">Clear</span>';
+      else if (item.special === 'manual') right = '<span class="app-picker-state">Add</span>';
+      else if (item.special === 'automatic') {
+        right = '<span class="app-picker-state">' + (item.selected ? 'Selected' : 'Auto') + '</span>';
+      } else if (selectMode) {
+        right = '<span class="app-picker-state">' + (item.selected ? 'Selected' : 'Select') + '</span>';
+      } else {
+        right = '<span class="app-picker-state">' + (item.enabled ? 'On' : 'Off') + '</span>';
+      }
+      return '<button type="button" class="' + cls + '" data-app-index="' + index + '">' +
+        appPickerIcon(item) +
+        '<span class="entity-picker-main">' +
+        '<span class="entity-picker-name">' + U.esc(item.name) + '</span>' +
+        '<span class="entity-picker-id">' +
+        (item.id ? U.esc(item.id) + (item.installed ? '' : ' · not installed') : U.esc(item.sub || '')) +
+        '</span>' +
+        '</span>' + right +
+        '</button>';
+    }).join('');
+    var normal = picker.items.filter(function (item) { return item.id; }).length;
+    if (!normal && picker.query) {
+      html += '<div class="app-picker-no-results">No matching apps. Press the red key or choose Search to try again.</div>';
+    }
+    host.innerHTML = html;
+    U.$$('#app-picker-list .app-icon-img').forEach(function (img) {
+      img.onerror = function () { this.style.display = 'none'; };
+    });
+    var node = host.querySelector('.app-picker-item.focused');
+    if (node) {
+      try { node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {
+        try { node.scrollIntoView(); } catch (err) { /* ignore */ }
+      }
+    }
+  }
+
+  function openAppPicker(options) {
+    if (!state.settings.draft) return;
+    options = options || {};
+    var mode = options.mode === 'select' ? 'select' : 'apps';
+    state.screen = 'app-picker';
+    state.appPicker = {
+      items: [],
+      index: 0,
+      loading: true,
+      error: '',
+      selectedId: '',
+      query: '',
+      installed: [],
+      mode: mode,
+      path: options.path || (mode === 'select' ? 'epg.nativeGuideAppId' : ''),
+      title: options.title || ''
+    };
+    A.UI.showScreen('app-picker');
+    renderAppPicker();
+    A.Platform.listApps(true).then(function (apps) {
+      if (state.screen !== 'app-picker') return;
+      state.appPicker.installed = (apps || []).slice();
+      state.appCatalog.items = (apps || []).slice();
+      state.appCatalog.updated = Date.now();
+      state.appPicker.loading = false;
+      state.appPicker.items = buildAppPickerItems();
+      if (mode === 'select') {
+        var draft = state.settings.draft || {};
+        var currentId = draft.epg ? (draft.epg.nativeGuideAppId || '') : '';
+        if (currentId) {
+          appPickerFocus(currentId);
+        } else {
+          var autoIndex = 0;
+          state.appPicker.items.forEach(function (item, index) {
+            if (item.special === 'automatic') autoIndex = index;
+          });
+          state.appPicker.index = autoIndex;
+        }
+      } else {
+        appPickerFocus(state.appPicker.selectedId);
+      }
+      renderAppPicker();
+    }).catch(function (err) {
+      if (state.screen !== 'app-picker') return;
+      state.appPicker.loading = false;
+      state.appPicker.error = 'Could not list installed apps: ' + err.message;
+      state.appPicker.items = buildAppPickerItems();
+      renderAppPicker();
+    });
+  }
+
+  function refreshAppPicker(focusId) {
+    state.appPicker.items = buildAppPickerItems();
+    appPickerFocus(focusId);
+    renderAppPicker();
+  }
+
+  function closeAppPicker() {
+    state.screen = 'settings';
+    A.UI.showScreen('settings');
+    renderSettingsScreen();
+  }
+
+  function toggleAppPickerItem(item) {
+    if (!item || item.special || !item.id) return;
+    var draft = state.settings.draft;
+    if (!draft || !draft.apps) return;
+    var list = draft.apps.items || [];
+    var found = -1;
+    list.forEach(function (app, index) { if (app.id === item.id) found = index; });
+    if (found >= 0) list.splice(found, 1);
+    else list.push({ id: item.id, name: item.name });
+    draft.apps.items = list;
+    state.settings.dirty = true;
+    refreshAppPicker(item.id);
+  }
+
+  function moveAppPickerItem(item, delta) {
+    if (!item || item.special || !item.enabled || !item.id) return;
+    var draft = state.settings.draft;
+    if (!draft || !draft.apps || !Array.isArray(draft.apps.items)) return;
+    var list = draft.apps.items;
+    var pos = -1;
+    list.forEach(function (app, index) { if (app.id === item.id) pos = index; });
+    var next = pos + delta;
+    if (pos < 0 || next < 0 || next >= list.length) return;
+    var swap = list[pos];
+    list[pos] = list[next];
+    list[next] = swap;
+    state.settings.dirty = true;
+    refreshAppPicker(item.id);
+  }
+
+  function addManualApp() {
+    if (!state.settings.draft) return;
+    A.UI.editor({
+      title: 'Add app',
+      eyebrow: 'APPS MENU',
+      label: 'Tizen application ID',
+      value: '',
+      placeholder: 'e.g. 3201907018807',
+      returnScreen: 'app-picker',
+      hint: 'The app name is taken from the installed app list where possible. Press OK to save, Back to cancel.'
+    }).then(function (value) {
+      if (value == null) return;
+      var id = String(value).trim();
+      if (!id) return;
+      var draft = state.settings.draft;
+      if (!draft.apps) draft.apps = { items: [] };
+      if (!Array.isArray(draft.apps.items)) draft.apps.items = [];
+      var exists = draft.apps.items.some(function (app) { return app.id === id; });
+      if (!exists) {
+        var installed = state.appPicker.installed || [];
+        var name = id;
+        installed.forEach(function (app) { if (app.id === id) name = app.name || id; });
+        draft.apps.items.push({ id: id, name: name });
+        state.settings.dirty = true;
+      }
+      state.screen = 'app-picker';
+      A.UI.showScreen('app-picker');
+      state.appPicker.query = '';
+      refreshAppPicker(id);
+    });
+  }
+
+  function promptAppSearch() {
+    A.UI.editor({
+      title: 'Search apps',
+      eyebrow: 'APPS MENU',
+      label: 'App name or ID',
+      value: state.appPicker.query || '',
+      placeholder: 'e.g. Netflix',
+      returnScreen: 'app-picker',
+      hint: 'Leave blank and save to show every app. Press OK to save, Back to cancel.'
+    }).then(function (value) {
+      if (value == null) return;
+      state.appPicker.query = String(value).trim();
+      state.screen = 'app-picker';
+      A.UI.showScreen('app-picker');
+      state.appPicker.items = buildAppPickerItems();
+      focusFirstAppPickerResult();
+      renderAppPicker();
+    });
+  }
+
+  function clearAppSearch() {
+    state.appPicker.query = '';
+    state.appPicker.items = buildAppPickerItems();
+    focusFirstAppPickerResult();
+    renderAppPicker();
+  }
+
+  function activateAppPickerItem() {
+    var item = state.appPicker.items[state.appPicker.index];
+    if (!item) return;
+    if (item.special === 'search') {
+      promptAppSearch();
+      return;
+    }
+    if (item.special === 'clear-search') {
+      clearAppSearch();
+      return;
+    }
+    if (state.appPicker.mode === 'select') {
+      var draft = state.settings.draft;
+      var path = state.appPicker.path || 'epg.nativeGuideAppId';
+      if (item.special === 'automatic') {
+        setPath(draft, path, '');
+        state.settings.dirty = true;
+        closeAppPicker();
+        A.UI.toast('Native guide app set to Automatic', 'ok', 2200);
+        return;
+      }
+      if (item.id) {
+        setPath(draft, path, item.id);
+        state.settings.dirty = true;
+        closeAppPicker();
+        A.UI.toast('Selected ' + item.name, 'ok', 2200);
+      }
+      return;
+    }
+    if (item.special === 'manual') {
+      addManualApp();
+      return;
+    }
+    toggleAppPickerItem(item);
+  }
+
+  function appPickerKey(code) {
+    if (code === 10009 || code === 27) {
+      closeAppPicker();
+      return true;
+    }
+    if (!state.appPicker.items.length) return true;
+    if (code === 403) {
+      promptAppSearch();
+      return true;
+    }
+    if (code === 38) {
+      state.appPicker.index = U.clamp(state.appPicker.index - 1, 0, state.appPicker.items.length - 1);
+      renderAppPicker();
+      return true;
+    }
+    if (code === 40) {
+      state.appPicker.index = U.clamp(state.appPicker.index + 1, 0, state.appPicker.items.length - 1);
+      renderAppPicker();
+      return true;
+    }
+    if (code === 13) {
+      activateAppPickerItem();
+      return true;
+    }
+    if (code === 37 || code === 39) {
+      if (state.appPicker.mode !== 'select') {
+        moveAppPickerItem(state.appPicker.items[state.appPicker.index], code === 39 ? 1 : -1);
+      }
+      return true;
+    }
+    return false;
+  }
+
   /* ---------- settings ---------- */
 
   function formatSyncTime(iso) {
@@ -1374,6 +2742,13 @@
     row('deviceName', 'Name', 'Shown in the header and remote config', 'text', draft.deviceName);
     row('deviceId', 'Device ID', 'Remote config identifier, e.g. conservatory', 'text', draft.deviceId);
 
+    add('Appearance');
+    var festiveLabels = { auto: 'Automatic', on: 'On', off: 'Off' };
+    row('ui.festiveMode', 'Festive mode',
+      'Automatic from 1 December to 6 January · choose On to preview',
+      'cycle', festiveLabels[draft.ui.festiveMode] || 'Automatic',
+      { cycleValues: ['auto', 'on', 'off'] });
+
     add('On-TV web configuration');
     var localStatus = A.LocalServer.status();
     var localIp = bareHost(draft.localServer.host) || A.LocalServer.localIP() || A.Platform.localIP() || '<TV-IP>';
@@ -1399,13 +2774,34 @@
       draft.ha.musicEntity || 'Not set', { picker: { domain: 'media_player' } });
     row('ha.lightEntity', 'Light entity', 'Choose a light from HA', 'entity',
       draft.ha.lightEntity || 'Not set', { picker: { domain: 'light' } });
-    row('ha.powerEntity', 'Power sensor entity', 'Choose a power or energy sensor from HA', 'entity',
+    row('ha.climateEntity', 'Climate entity', 'Current temperature shown on the home sensor strip', 'entity',
+      draft.ha.climateEntity || 'Not set', { picker: { domain: 'climate' } });
+    row('ha.weatherEntity', 'Weather entity', 'Hourly forecast shown beside the clock', 'entity',
+      draft.ha.weatherEntity || 'Not set', { picker: { domain: 'weather' } });
+    row('ha.powerEntity', 'Electricity usage sensor', 'Power or energy sensor shown on the home strip', 'entity',
       draft.ha.powerEntity || 'Not set', { picker: { domain: 'sensor', deviceClasses: ['power', 'energy'] } });
+    row('ha.gasEntity', 'Gas usage sensor', 'Gas meter or usage sensor shown beside electricity', 'entity',
+      draft.ha.gasEntity || 'Not set', { picker: { domain: 'sensor', deviceClasses: ['gas', 'energy'] } });
 
     add('TV guide');
+    row('epg.nativeGuide', 'Native TV Guide app', 'Use the TV’s built-in guide instead of the XMLTV grid', 'toggle',
+      !!draft.epg.nativeGuide);
+    row('epg.nativeGuideApp', 'Native guide app',
+      draft.epg.nativeGuideAppId
+        ? 'Selected: ' + nativeGuideAppName(draft.epg.nativeGuideAppId)
+        : 'Automatic — detect the installed guide app',
+      'action', '',
+      { actionLabel: draft.epg.nativeGuideAppId ? 'Change' : 'Choose' });
     row('epg.xmltvUrl', 'XMLTV URL', 'CORS-enabled plain XMLTV (.xml)', 'text',
       draft.epg.xmltvUrl || 'Not set');
     row('epg.demo', 'Demo guide', 'Sample channels when no XMLTV is configured', 'toggle', !!draft.epg.demo);
+
+    add('Apps menu');
+    var appCount = draft.apps && draft.apps.items ? draft.apps.items.length : 0;
+    row('apps.configure', 'Apps menu', appCount
+      ? appCount + (appCount === 1 ? ' app selected · press to reorder' : ' apps selected · press to reorder')
+      : 'Choose installed apps and their order', 'action', '',
+      { actionLabel: appCount ? String(appCount) : 'Choose' });
 
     add('Live TV inputs');
     ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'].forEach(function (id) {
@@ -1460,6 +2856,7 @@
   }
 
   function openSettings() {
+    ensureAppCatalog();
     state.screen = 'settings';
     state.settings.draft = A.Config.clone();
     state.settings.index = 0;
@@ -1498,6 +2895,10 @@
       if (row.id === 'remoteSync') return syncRemoteConfig(true);
       if (row.id === 'localServerInfo') return showLocalServerInfo();
       if (row.id === 'setupQr') return openSetupQR(true);
+      if (row.id === 'apps.configure') return openAppPicker();
+      if (row.id === 'epg.nativeGuideApp') {
+        return openAppPicker({ mode: 'select', path: 'epg.nativeGuideAppId', title: 'Native guide app' });
+      }
       return;
     }
 
@@ -1539,15 +2940,26 @@
   function cycleSetting(index, delta) {
     var row = state.settings.actions[index];
     var draft = state.settings.draft;
-    if (!row || !row.cycleId) return;
+    if (!row) return;
+    if (Array.isArray(row.cycleValues) && row.cycleValues.length) {
+      var current = String(getPath(draft, row.id) || row.cycleValues[0]);
+      var pos = row.cycleValues.indexOf(current);
+      if (pos < 0) pos = 0;
+      var next = row.cycleValues[(pos + delta + row.cycleValues.length) % row.cycleValues.length];
+      setPath(draft, row.id, next);
+      state.settings.dirty = true;
+      renderSettingsScreen();
+      return;
+    }
+    if (!row.cycleId) return;
     var dashboards = draft.ha.dashboards || [];
     if (!dashboards.length) return;
-    var current = 0;
+    var currentDashboard = 0;
     dashboards.forEach(function (dashboard, i) {
-      if (dashboard.id === draft.ha.defaultDashboard) current = i;
+      if (dashboard.id === draft.ha.defaultDashboard) currentDashboard = i;
     });
-    current = (current + delta + dashboards.length) % dashboards.length;
-    draft.ha.defaultDashboard = dashboards[current].id;
+    currentDashboard = (currentDashboard + delta + dashboards.length) % dashboards.length;
+    draft.ha.defaultDashboard = dashboards[currentDashboard].id;
     state.settings.dirty = true;
     renderSettingsScreen();
   }
@@ -1578,6 +2990,52 @@
       ['Security', 'Use the access token when the browser asks. The server is only reachable on the LAN.'],
       ['Note', 'The server runs only while Aurora is in the foreground.']
     ]);
+  }
+
+  function resetSettingItem() {
+    var row = state.settings.actions[state.settings.index];
+    var draft = state.settings.draft;
+    if (!row || !draft) return;
+    var path = row.id;
+    if (row.id === 'epg.nativeGuideApp') path = 'epg.nativeGuideAppId';
+    else if (row.kind === 'action') {
+      A.UI.toast('No default for this item', '', 2200);
+      return;
+    }
+    var def = A.Config.defaultFor(path);
+    if (def === undefined) {
+      A.UI.toast('No default for this item', '', 2200);
+      return;
+    }
+    var current = getPath(draft, path);
+    if (JSON.stringify(current) === JSON.stringify(def)) {
+      A.UI.toast('Already at the default', '', 2000);
+      return;
+    }
+    setPath(draft, path, (def && typeof def === 'object') ? JSON.parse(JSON.stringify(def)) : def);
+    state.settings.dirty = true;
+    renderSettingsScreen();
+    A.UI.toast('Reset ' + row.label + ' to default', 'ok', 2200);
+  }
+
+  function promptSettingsExit() {
+    A.UI.confirmSave({
+      title: 'Save changes?',
+      message: 'You have unsaved settings. Save them before leaving, or discard your changes.',
+      saveLabel: 'Save',
+      discardLabel: 'Discard',
+      cancelLabel: 'Cancel'
+    }).then(function (choice) {
+      if (choice === 'save') {
+        saveSettings();
+        return;
+      }
+      if (choice === 'discard') {
+        state.settings.draft = null;
+        state.settings.dirty = false;
+        showHome();
+      }
+    });
   }
 
   function saveSettings() {
@@ -1641,6 +3099,8 @@
       ['Tizen TV input keys', diag.capabilities.tvinputdevice ? 'available' : 'unavailable'],
       ['B2B input API', diag.capabilities.b2b ? 'available' : 'not present'],
       ['Home Assistant', A.HA.connected ? 'connected' : (A.HA.error || 'not connected')],
+      ['Art Mode', artModeAvailable() ? 'supported' : 'not supported'],
+      ['Festive mode', festiveMode() + (festiveActive() ? ' · active' : ' · inactive')],
       ['Guide', A.EPG.summary().source + ' · ' + A.EPG.summary().channels + ' channels'],
       ['On-TV server', (function () {
         var s = A.LocalServer.status();
@@ -1731,18 +3191,57 @@
     var handled = false;
 
     if (state.screen === 'home') {
-      if (code === 37) { moveTile(-1); handled = true; }
-      else if (code === 39) { moveTile(1); handled = true; }
-      else if (code === 13) {
-        var tile = state.tiles[state.tileIndex];
-        if (tile) activateTile(tile.id);
-        handled = true;
-      } else if (code === 38 || code === 40) {
-        handled = true; // single rail: absorb to keep the UI still
-      } else if (code === 10009 || code === 27) {
-        exitHome();
-        handled = true;
+      if (state.homeRegion === 'sensors') {
+        if (code === 37) { moveSensor(-1); handled = true; }
+        else if (code === 39) { moveSensor(1); handled = true; }
+        else if (code === 38 || code === 10009 || code === 27) {
+          cancelSensorPress();
+          focusTiles();
+          handled = true;
+        } else if (code === 13) {
+          if (!state.sensorPress) beginSensorPress(state.sensorIndex);
+          handled = true;
+        } else {
+          handled = true;
+        }
+      } else if (state.homeRegion === 'notifications') {
+        if (code === 40) { focusTiles(); handled = true; }
+        else if (code === 13) { openNotifications(); handled = true; }
+        else if (code === 10009 || code === 27) { focusTiles(); handled = true; }
+        else handled = true;
+      } else if (state.apps.open) {
+        if (code === 37) { moveApp(-1); handled = true; }
+        else if (code === 39) { moveApp(1); handled = true; }
+        else if (code === 13) {
+          var appId = cfg().apps.items[state.apps.index] ? cfg().apps.items[state.apps.index].id : '';
+          if (appId) launchAppItem(appId);
+          handled = true;
+        } else if (code === 38 || code === 40 || code === 10009 || code === 27) {
+          closeAppsRow();
+          handled = true;
+        }
+      } else {
+        if (code === 37) { moveTile(-1); handled = true; }
+        else if (code === 39) { moveTile(1); handled = true; }
+        else if (code === 13) {
+          var tile = state.tiles[state.tileIndex];
+          if (tile) activateTile(tile.id);
+          handled = true;
+        } else if (code === 38) {
+          if (notificationCount()) focusNotifications();
+          handled = true;
+        } else if (code === 40) {
+          if (sensorList().length) focusSensors();
+          handled = true;
+        } else if (code === 10009 || code === 27) {
+          exitHome();
+          handled = true;
+        }
       }
+    } else if (state.screen === 'notifications') {
+      if (notificationsKey(code)) handled = true;
+    } else if (state.screen === 'app-picker') {
+      if (appPickerKey(code)) handled = true;
     } else if (state.screen === 'guide') {
       if (code === 37) { moveGuide(-1, 0); handled = true; }
       else if (code === 39) { moveGuide(1, 0); handled = true; }
@@ -1780,12 +3279,16 @@
       } else if (code === 13) {
         activateSetting(state.settings.index);
         handled = true;
+      } else if (code === 406) {
+        resetSettingItem();
+        handled = true;
       } else if (code === 10009 || code === 27) {
         if (state.settings.dirty) {
-          A.UI.toast('Unsaved changes discarded', '', 2200);
+          promptSettingsExit();
+        } else {
+          state.settings.draft = null;
+          showHome();
         }
-        state.settings.draft = null;
-        showHome();
         handled = true;
       }
     }
@@ -1863,7 +3366,14 @@
     options = options || {};
     var conf = cfg();
     state.lastExternal = conf.ui.lastExternal || 'livetv';
+    var haKey = [conf.ha.baseUrl, conf.ha.token, conf.ha.climateEntity, conf.ha.weatherEntity].join('|');
+    if (state.haKey !== haKey) {
+      state.haKey = haKey;
+      state.weather.updated = 0;
+      state.calendar.updated = 0;
+    }
     A.HA.configure(conf.ha);
+    applyFestiveMode(true, true);
     scheduleEPGReload();
     scheduleRemoteSync();
     // The embedded WASM configuration server is the heaviest startup task.
@@ -1876,6 +3386,8 @@
     loadEPG();
     refreshChannel();
     updateHomeChrome();
+    setTimeout(loadCalendarIfStale, 2000);
+    setTimeout(loadWeatherIfStale, 2000);
   }
 
   function startClock() {
@@ -1883,6 +3395,7 @@
     state.tickTimer = setInterval(function () {
       var now = new Date();
       A.UI.updateClock(now);
+      if (now.getSeconds() === 0) applyFestiveMode(false);
       if (state.screen === 'home' && now.getSeconds() === 0) updateHomeChrome();
       if (state.screen === 'music' && A.HANative) A.HANative.tickMusic();
       if (state.haTemp) {
@@ -1894,15 +3407,28 @@
   }
 
   function bindUI() {
-    var settingsButton = q('#btn-settings');
-    if (settingsButton) {
-      settingsButton.addEventListener('click', openSettings);
-    }
     var setupClose = q('#setup-close');
     if (setupClose) {
       setupClose.addEventListener('click', dismissSetupQR);
     }
     document.addEventListener('keydown', onKeyDown);
+    var notifyButton = q('#home-notify');
+    if (notifyButton) {
+      notifyButton.addEventListener('click', function () {
+        if (state.screen === 'home') openNotifications();
+      });
+    }
+    document.addEventListener('keyup', function (event) {
+      if (sensorKeyUp(event.keyCode)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (A.HANative && A.HANative.handleKeyUp && A.HANative.handleKeyUp(event.keyCode)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
         setInputBackdrop(false);
@@ -1913,6 +3439,8 @@
       refreshChannel();
       refreshHdmiSources();
       updateLivePreview();
+      loadCalendarIfStale();
+      loadWeatherIfStale();
       if (state.screen === 'home') updateHomeChrome();
       if (state.haTemp) A.UI.setHACountdown(state.haTemp.endsAt - Date.now(), true);
       var rc = cfg().remoteConfig || {};
@@ -1947,14 +3475,22 @@
         }, 250);
       });
 
+      A.HA.on('notifications', function () {
+        if (state.screen === 'home') renderHome();
+        else if (state.screen === 'notifications') renderNotifications();
+      });
+
       A.HA.on('change', function () {
         A.UI.renderStatus(statusModel());
         if (state.screen === 'home') {
-          A.UI.renderSensors(A.HA.sensors());
+          renderSensorsHome();
+          A.UI.renderWeather(weatherModel());
           var sub = q('#home-sub');
           if (sub) sub.textContent = homeSubtitle();
         }
         refreshChannelSoon();
+        loadCalendarIfStale();
+        loadWeatherIfStale();
         if (A.HANative) A.HANative.onHAChange();
       });
 
@@ -1971,6 +3507,10 @@
 
       state.sourcesTimer = setInterval(refreshHdmiSources, 30000);
       state.channelTimer = setInterval(refreshChannel, 60000);
+      state.calendarTimer = setInterval(loadCalendarIfStale, 15 * 60000);
+      setTimeout(loadCalendarIfStale, 2500);
+      state.weatherTimer = setInterval(loadWeatherIfStale, 15 * 60000);
+      setTimeout(loadWeatherIfStale, 2500);
 
       setTimeout(function () {
         var conf = cfg();
@@ -2006,6 +3546,7 @@
     boot: boot,
     state: state,
     showHome: showHome,
+    onModelReady: onModelReady,
     openGuide: openGuide,
     openSettings: openSettings,
     activateSource: activateSource,

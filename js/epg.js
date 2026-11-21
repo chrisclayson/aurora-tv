@@ -33,6 +33,22 @@
     return Date.UTC(year, month, day, hour, minute, second) - offset * 60000;
   }
 
+  function lcnValue(channel) {
+    var match = String((channel && channel.number) || '').match(/\d+(?:\.\d+)?/);
+    if (!match) return Number.MAX_SAFE_INTEGER;
+    return parseFloat(match[0]);
+  }
+
+  function sortByLcn(channels) {
+    channels.sort(function (a, b) {
+      var left = lcnValue(a);
+      var right = lcnValue(b);
+      if (left !== right) return left - right;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    return channels;
+  }
+
   function parseXmltv(xmlText) {
     var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
     if (!doc || doc.getElementsByTagName('parsererror').length) {
@@ -50,10 +66,17 @@
       var name = names.length ? String(names[0].textContent || '').trim() : id;
       var lcn = node.getElementsByTagName('lcn')[0];
       var iconNode = node.getElementsByTagName('icon')[0];
+      var number = lcn ? String(lcn.textContent || '').trim() : '';
+      if (!/\d/.test(number)) {
+        // tv_grab_uk_freeview uses the Freeview LCN as the channel id
+        // (for example "101.uk"), even though it does not emit <lcn>.
+        var idLcn = String(id).match(/^(\d{1,4})\./);
+        number = idLcn ? idLcn[1] : String(index + 1);
+      }
       var channel = {
         id: id,
         name: name || id,
-        number: lcn ? String(lcn.textContent || '').trim() : String(index + 1),
+        number: number,
         icon: iconNode ? iconNode.getAttribute('src') || '' : ''
       };
       channels.push(channel);
@@ -92,12 +115,12 @@
 
     if (!count) throw new Error('XMLTV contains no programmes');
 
-    var withPrograms = channels.filter(function (channel) {
+    var withPrograms = sortByLcn(channels.filter(function (channel) {
       var list = programs[channel.id];
       if (!list) return false;
       list.sort(function (a, b) { return a.start - b.start; });
       return true;
-    });
+    }));
 
     return { channels: withPrograms, programs: programs };
   }
@@ -202,7 +225,7 @@
       });
       programs[channel.id] = demoProgramsFor(channel, from, to);
     });
-    state.channels = channels;
+    state.channels = sortByLcn(channels);
     state.programs = programs;
     state.source = 'demo';
     state.error = '';

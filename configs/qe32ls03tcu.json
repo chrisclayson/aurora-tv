@@ -35,7 +35,8 @@
     }
   },
   "ui": {
-    "lastExternal": "hdmi1"
+    "lastExternal": "hdmi1",
+    "festiveMode": "auto"
   },
   "remoteConfig": {
     "enabled": false,
@@ -45,5 +46,19 @@
   },
   "localServer": {
     "enabled": true
+  },
+  "ha": {
+    "climateEntity": "",
+    "weatherEntity": "",
+    "baseUrl": "http://homeassistant.local:8123",
+    "gasEntity": ""
+  },
+  "epg": {
+    "nativeGuide": false,
+    "nativeGuideAppId": "",
+    "xmltvUrl": "http://homeassistant.local:8090/epg.xml"
+  },
+  "apps": {
+    "items": []
   }
 }

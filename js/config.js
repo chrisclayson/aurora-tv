@@ -12,7 +12,7 @@
     model: '',
     ha: {
       enabled: false,
-      baseUrl: '',
+      baseUrl: 'http://homeassistant.local:8123',
       token: '',
       pages: [
         { id: 'home', name: 'Home', widgets: [] }
@@ -21,13 +21,21 @@
       tvEntity: '',
       musicEntity: '',
       lightEntity: '',
-      powerEntity: ''
+      climateEntity: '',
+      weatherEntity: '',
+      powerEntity: '',
+      gasEntity: ''
     },
     epg: {
-      xmltvUrl: '',
+      xmltvUrl: 'http://homeassistant.local:8090/epg.xml',
       demo: true,
       refreshMinutes: 60,
-      horizonHours: 3
+      horizonHours: 3,
+      nativeGuide: false,
+      nativeGuideAppId: ''
+    },
+    apps: {
+      items: []
     },
     sources: {
       hdmi1: { label: 'HDMI 1', sub: 'Apple TV', appId: '', haSource: 'HDMI1' },
@@ -43,7 +51,8 @@
     ui: {
       lastExternal: 'livetv',
       dashboardDuration: 30,
-      overlayTimeoutMs: 3500
+      overlayTimeoutMs: 3500,
+      festiveMode: 'auto'
     },
     remoteConfig: {
       enabled: false,
@@ -133,7 +142,20 @@
     if (pageIds.indexOf(cfg.ha.currentPage) === -1) cfg.ha.currentPage = pageIds[0];
     cfg.epg.horizonHours = Math.max(1, Math.min(12, Number(cfg.epg.horizonHours) || 3));
     cfg.epg.refreshMinutes = Math.max(5, Math.min(1440, Number(cfg.epg.refreshMinutes) || 60));
+    cfg.epg.nativeGuide = cfg.epg.nativeGuide === true;
+    cfg.epg.nativeGuideAppId = String(cfg.epg.nativeGuideAppId || '').trim();
+    if (!cfg.apps || typeof cfg.apps !== 'object') cfg.apps = { items: [] };
+    var seenApps = {};
+    cfg.apps.items = (Array.isArray(cfg.apps.items) ? cfg.apps.items : []).map(function (item) {
+      if (typeof item === 'string') item = { id: item, name: item };
+      if (!item || !item.id) return null;
+      var id = String(item.id).trim();
+      if (!id || seenApps[id]) return null;
+      seenApps[id] = true;
+      return { id: id, name: String(item.name || id).trim() || id };
+    }).filter(Boolean).slice(0, 40);
     cfg.ui.dashboardDuration = Math.max(5, Math.min(3600, Number(cfg.ui.dashboardDuration) || 30));
+    if (['auto', 'on', 'off'].indexOf(cfg.ui.festiveMode) === -1) cfg.ui.festiveMode = 'auto';
     cfg.ui.overlayTimeoutMs = Math.max(1500, Math.min(15000, Number(cfg.ui.overlayTimeoutMs) || 3500));
     if (!cfg.sources[cfg.ui.lastExternal]) cfg.ui.lastExternal = 'livetv';
     // Older seeds used non-existent input app IDs. HDMI uses the native
@@ -147,14 +169,17 @@
     }
     cfg.deviceId = String(cfg.deviceId || 'tv').replace(/[^a-zA-Z0-9_-]/g, '-') || 'tv';
     cfg.deviceName = String(cfg.deviceName || 'Living Room').trim() || 'Living Room';
-    cfg.ha.baseUrl = String(cfg.ha.baseUrl || '').trim().replace(/\/+$/, '');
+    cfg.ha.baseUrl = String(cfg.ha.baseUrl || DEFAULTS.ha.baseUrl).trim().replace(/\/+$/, '');
     cfg.ha.token = String(cfg.ha.token || '').trim();
     cfg.ha.tvEntity = String(cfg.ha.tvEntity || '').trim();
     cfg.ha.musicEntity = String(cfg.ha.musicEntity || '').trim();
     cfg.ha.lightEntity = String(cfg.ha.lightEntity || '').trim();
+    cfg.ha.climateEntity = String(cfg.ha.climateEntity || '').trim();
+    cfg.ha.weatherEntity = String(cfg.ha.weatherEntity || '').trim();
     delete cfg.ha.motionEntity;
     cfg.ha.powerEntity = String(cfg.ha.powerEntity || '').trim();
-    cfg.epg.xmltvUrl = String(cfg.epg.xmltvUrl || '').trim();
+    cfg.ha.gasEntity = String(cfg.ha.gasEntity || '').trim();
+    cfg.epg.xmltvUrl = String(cfg.epg.xmltvUrl || DEFAULTS.epg.xmltvUrl).trim();
     if (!cfg.remoteConfig || typeof cfg.remoteConfig !== 'object') cfg.remoteConfig = clone(DEFAULTS.remoteConfig);
     cfg.remoteConfig.url = String(cfg.remoteConfig.url || '').trim();
     cfg.remoteConfig.token = String(cfg.remoteConfig.token || '').trim();
@@ -272,10 +297,21 @@
     });
   }
 
+  function defaultFor(path) {
+    var value = clone(DEFAULTS);
+    var parts = String(path || '').split('.');
+    for (var i = 0; i < parts.length; i++) {
+      if (value == null || typeof value !== 'object') return undefined;
+      value = value[parts[i]];
+    }
+    return value === undefined ? undefined : clone(value);
+  }
+
   A.Config = {
     DEFAULTS: DEFAULTS,
     init: init,
     get: get,
+    defaultFor: defaultFor,
     clone: cloneConfig,
     save: save,
     reset: reset,

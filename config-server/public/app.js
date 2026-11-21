@@ -7,22 +7,24 @@
     deviceName: 'Living Room',
     model: '',
     ha: {
-      enabled: false, baseUrl: '', token: '',
+      enabled: false, baseUrl: 'http://homeassistant.local:8123', token: '',
       pages: [{ id: 'home', name: 'Home', widgets: [] }],
       currentPage: 'home',
-      tvEntity: '', musicEntity: '', lightEntity: '', powerEntity: ''
+      tvEntity: '', musicEntity: '', lightEntity: '', climateEntity: '', weatherEntity: '', powerEntity: '', gasEntity: ''
     },
-    epg: { xmltvUrl: '', demo: true, refreshMinutes: 60, horizonHours: 3 },
+    epg: { xmltvUrl: 'http://homeassistant.local:8090/epg.xml', demo: true, refreshMinutes: 60, horizonHours: 3, nativeGuide: false, nativeGuideAppId: '' },
+    apps: { items: [] },
     sources: {
-      hdmi1: { label: 'HDMI 1', sub: 'Apple TV', appId: 'org.tizen.hdmi1', haSource: 'HDMI1' },
-      hdmi2: { label: 'HDMI 2', sub: 'Games console', appId: 'org.tizen.hdmi2', haSource: 'HDMI2' },
-      hdmi3: { label: 'HDMI 3', sub: 'Media PC', appId: 'org.tizen.hdmi3', haSource: 'HDMI3' },
-      hdmi4: { label: 'HDMI 4', sub: 'Spare input', appId: 'org.tizen.hdmi4', haSource: 'HDMI4' },
-      livetv: { label: 'Live TV', sub: 'Antenna / cable', appId: 'org.tizen.tv', haSource: 'TV' }
+      hdmi1: { label: 'HDMI 1', sub: 'Apple TV', appId: '', haSource: 'HDMI1' },
+      hdmi2: { label: 'HDMI 2', sub: 'Games console', appId: '', haSource: 'HDMI2' },
+      hdmi3: { label: 'HDMI 3', sub: 'Media PC', appId: '', haSource: 'HDMI3' },
+      hdmi4: { label: 'HDMI 4', sub: 'Spare input', appId: '', haSource: 'HDMI4' },
+      livetv: { label: 'Live TV', sub: 'Antenna / cable', appId: 'org.tizen.tv-viewer', haSource: 'TV' }
     },
     livetv: { guideAppId: '', defaultChannel: '' },
-    ui: { lastExternal: 'livetv', dashboardDuration: 30, overlayTimeoutMs: 3500 },
-    remoteConfig: { enabled: false, url: '', token: '', pollMinutes: 5 }
+    ui: { lastExternal: 'livetv', dashboardDuration: 30, overlayTimeoutMs: 3500, festiveMode: 'auto' },
+    remoteConfig: { enabled: false, url: '', token: '', pollMinutes: 5 },
+    localServer: { enabled: true, token: '', host: '' }
   };
 
   var TOKEN_KEY = 'aurora-config-token';
@@ -262,13 +264,27 @@
     return getPath(state.config, path);
   }
 
+  function defaultExists(path) {
+    return getPath(DEFAULTS, path) !== undefined;
+  }
+
+  function resetControl(path) {
+    if (!defaultExists(path)) return '';
+    return '<button type="button" class="field-reset" data-reset-field="' + esc(path) + '">Reset</button>';
+  }
+
+  function fieldHead(path, label, options) {
+    var reset = options && options.readonly ? '' : resetControl(path);
+    return '<span class="field-head"><span>' + esc(label) + '</span>' + reset + '</span>';
+  }
+
   function inputField(path, label, options) {
     options = options || {};
     var raw = value(path);
     var type = options.type || 'text';
     var val = raw == null ? '' : raw;
     return '<label class="field' + (options.span ? ' span-2' : '') + '">' +
-      '<span>' + esc(label) + '</span>' +
+      fieldHead(path, label, options) +
       '<input type="' + type + '" data-path="' + esc(path) + '" value="' + esc(val) + '"' +
       (options.placeholder ? ' placeholder="' + esc(options.placeholder) + '"' : '') +
       (options.readonly ? ' readonly' : '') +
@@ -283,7 +299,7 @@
     var raw = value(path);
     var val = raw == null ? '' : raw;
     return '<label class="field' + (options.span ? ' span-2' : '') + '">' +
-      '<span>' + esc(label) + '</span>' +
+      fieldHead(path, label) +
       '<div class="picker-input">' +
       '<input type="text" data-path="' + esc(path) + '" value="' + esc(val) + '"' +
       (options.placeholder ? ' placeholder="' + esc(options.placeholder) + '"' : '') +
@@ -314,7 +330,7 @@
     if (current && !options.some(function (item) { return String(typeof item === 'string' ? item : item.value) === current; })) {
       optionsHtml += '<option value="' + esc(current) + '" selected>' + esc(current) + '</option>';
     }
-    return '<label class="field"><span>' + esc(label) + '</span>' +
+    return '<label class="field">' + fieldHead(path, label) +
       '<select data-path="' + esc(path) + '">' + optionsHtml + '</select>' +
       (hint ? '<small>' + esc(hint) + '</small>' : '') +
       '</label>';
@@ -323,8 +339,9 @@
   function toggleField(path, label, hint) {
     return '<div class="toggle-row"><div class="toggle-copy"><b>' + esc(label) + '</b>' +
       (hint ? '<small>' + esc(hint) + '</small>' : '') + '</div>' +
+      '<div class="field-reset-wrap">' + resetControl(path) +
       '<label class="switch"><input type="checkbox" data-path="' + esc(path) + '"' +
-      (value(path) ? ' checked' : '') + '><span class="switch-track"></span></label></div>';
+      (value(path) ? ' checked' : '') + '><span class="switch-track"></span></label></div></div>';
   }
 
   function card(titleText, description, body) {
@@ -345,6 +362,30 @@
       inputField('sources.' + id + '.appId', 'Fallback app ID', { placeholder: 'Leave empty; TVWindow is used' }) +
       inputField('sources.' + id + '.haSource', 'Home Assistant source', { placeholder: label }) +
       '</div></div>';
+  }
+
+  function appItems() {
+    if (!state.config.apps || typeof state.config.apps !== 'object') state.config.apps = { items: [] };
+    if (!Array.isArray(state.config.apps.items)) state.config.apps.items = [];
+    return state.config.apps.items;
+  }
+
+  function appsEditor() {
+    var items = appItems();
+    var rows = items.map(function (app, index) {
+      return '<div class="app-row">' +
+        '<span class="app-order">' + (index + 1) + '</span>' +
+        '<input type="text" data-app-index="' + index + '" data-app-field="name" value="' + esc(app.name || '') + '" placeholder="App name" autocomplete="off">' +
+        '<input type="text" data-app-index="' + index + '" data-app-field="id" value="' + esc(app.id || '') + '" placeholder="Tizen app ID" autocomplete="off" spellcheck="false">' +
+        '<button type="button" class="btn ghost small" data-app-up="' + index + '"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="btn ghost small" data-app-down="' + index + '"' + (index === items.length - 1 ? ' disabled' : '') + '>↓</button>' +
+        '<button type="button" class="btn ghost small" data-app-remove="' + index + '">Remove</button>' +
+        '</div>';
+    }).join('');
+    if (!rows) rows = '<p class="section-note">No apps selected. The Apps tile stays hidden until an app is added.</p>';
+    return '<div class="app-list">' + rows + '</div>' +
+      '<div class="inline-actions"><button type="button" class="btn ghost small" data-app-add>Add app</button>' +
+      '<span class="section-note">Use Settings → Apps menu on the TV to list and select installed apps.</span></div>';
   }
 
   function render() {
@@ -377,6 +418,15 @@
       inputField('deviceId', 'Device ID', { readonly: true, hint: 'Read-only. Create a new device to change it.' }) +
       '</div>');
 
+    html += card('Appearance', 'Seasonal styling for the home screen.',
+      '<div class="grid two">' +
+      selectField('ui.festiveMode', 'Festive mode', [
+        { value: 'auto', label: 'Automatic (1 December – 6 January)' },
+        { value: 'on', label: 'On (preview / test)' },
+        { value: 'off', label: 'Off' }
+      ], 'Automatic enables the festive theme from 1 December to 6 January. Choose On to test it now.') +
+      '</div>');
+
     html += card('Remote configuration', 'Aurora fetches this profile from the config server on boot and every few minutes.',
       '<div class="grid">' + toggleField('remoteConfig.enabled', 'Poll this server', 'Enable remote configuration on the TV.') + '</div>' +
       '<div class="grid two" style="margin-top:14px">' +
@@ -402,21 +452,36 @@
       entityField('ha.tvEntity', 'TV media_player entity', { domain: 'media_player', placeholder: 'media_player.living_room_tv' }) +
       entityField('ha.musicEntity', 'Music media_player entity', { domain: 'media_player', placeholder: 'media_player.music_assistant' }) +
       entityField('ha.lightEntity', 'Light entity', { domain: 'light', placeholder: 'light.living_room_lamp' }) +
-      entityField('ha.powerEntity', 'Power sensor entity', { domain: 'sensor', deviceClasses: ['power', 'energy'], placeholder: 'sensor.tv_plug_power' }) +
+      entityField('ha.climateEntity', 'Climate entity', { domain: 'climate', placeholder: 'climate.living_room' }) +
+      entityField('ha.weatherEntity', 'Weather entity', { domain: 'weather', placeholder: 'weather.home' }) +
+      entityField('ha.powerEntity', 'Electricity usage sensor', { domain: 'sensor', deviceClasses: ['power', 'energy'], placeholder: 'sensor.tv_plug_power' }) +
+      entityField('ha.gasEntity', 'Gas usage sensor', { domain: 'sensor', deviceClasses: ['gas', 'energy'], placeholder: 'sensor.gas_meter' }) +
       '</div>' +
       '<p class="section-note">Entity widgets and named pages are added on the TV using <b>Add entities</b> and <b>Pages</b>.</p>' +
       '<div class="inline-actions"><button type="button" class="btn ghost small" data-test="ha">Test Home Assistant</button>' +
       '<span class="test-result" data-test-result="ha"></span></div>');
 
-    html += card('TV guide', 'XMLTV feed used by the guide. Leave empty to keep the demo grid.',
+    html += card('TV guide', 'Use the TV’s native guide, or an XMLTV feed. Leave the XMLTV URL empty to keep the demo grid.',
+      '<div class="grid" style="margin-bottom:14px">' +
+      toggleField('epg.nativeGuide', 'Native TV Guide app', 'Launch the built-in TV Guide instead of the XMLTV grid. XMLTV remains the default.') +
+      '</div>' +
       '<div class="grid two">' +
+      inputField('epg.nativeGuideAppId', 'Native guide app ID', { placeholder: 'Leave empty to detect automatically', hint: 'Optional. On the TV, choose the app from Settings → TV guide → Native guide app.' }) +
       inputField('epg.xmltvUrl', 'XMLTV URL', { placeholder: 'http://epg.local:8080/xmltv.xml', span: true }) +
       inputField('epg.refreshMinutes', 'Refresh interval (minutes)', { type: 'number', placeholder: '60' }) +
       inputField('epg.horizonHours', 'Visible hours', { type: 'number', placeholder: '3' }) +
       '</div>' +
       '<div class="grid" style="margin-top:14px">' + toggleField('epg.demo', 'Demo guide', 'Show sample channels when no XMLTV is configured.') + '</div>' +
+      '<div class="grid two" style="margin-top:14px">' +
+      readonlyField('Add-on guide feed', SERVER_BASE + '/epg.xml', 'UK Freeview XMLTV with LCN numbers, refreshed hourly on the Home Assistant shared port.') +
+      '</div>' +
       '<div class="inline-actions"><button type="button" class="btn ghost small" data-test="xmltv">Test XMLTV</button>' +
-      '<span class="test-result" data-test-result="xmltv"></span></div>');
+      '<button type="button" class="btn ghost small" data-epg-refresh>Refresh add-on guide</button>' +
+      '<span class="test-result" data-test-result="xmltv"></span>' +
+      '<span class="test-result" data-epg-status></span></div>');
+
+    html += card('Apps menu', 'Apps shown in a second home row when the Apps tile is opened. No apps are enabled by default; without entries the Apps tile is hidden.',
+      appsEditor());
 
     var sources = '';
     ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'].forEach(function (id, index) { sources += sourceCard(id, index); });
@@ -450,12 +515,24 @@
       cfg.ha.currentPage = cfg.ha.pages[0].id;
     }
     cfg.ui.overlayTimeoutMs = Math.max(1500, Math.min(15000, Number(cfg.ui.overlayTimeoutMs) || 3500));
+    if (['auto', 'on', 'off'].indexOf(cfg.ui.festiveMode) === -1) cfg.ui.festiveMode = 'auto';
     cfg.epg.refreshMinutes = Math.max(5, Math.min(1440, Number(cfg.epg.refreshMinutes) || 60));
     cfg.epg.horizonHours = Math.max(1, Math.min(12, Number(cfg.epg.horizonHours) || 3));
     cfg.remoteConfig.pollMinutes = Math.max(1, Math.min(1440, Number(cfg.remoteConfig.pollMinutes) || 5));
     cfg.ha.baseUrl = String(cfg.ha.baseUrl || '').trim().replace(/\/+$/, '');
     cfg.ha.token = String(cfg.ha.token || '').trim();
     cfg.epg.xmltvUrl = String(cfg.epg.xmltvUrl || '').trim();
+    cfg.epg.nativeGuide = cfg.epg.nativeGuide === true;
+    cfg.epg.nativeGuideAppId = String(cfg.epg.nativeGuideAppId || '').trim();
+    if (!cfg.apps || typeof cfg.apps !== 'object') cfg.apps = { items: [] };
+    var seenAppIds = {};
+    cfg.apps.items = (Array.isArray(cfg.apps.items) ? cfg.apps.items : []).map(function (app) {
+      if (!app || !String(app.id || '').trim()) return null;
+      var id = String(app.id).trim();
+      if (seenAppIds[id]) return null;
+      seenAppIds[id] = true;
+      return { id: id, name: String(app.name || id).trim() || id };
+    }).filter(Boolean);
     cfg.remoteConfig.url = String(cfg.remoteConfig.url || '').trim();
     cfg.remoteConfig.token = String(cfg.remoteConfig.token || '').trim();
     if (cfg.remoteConfig.enabled && !cfg.remoteConfig.token && state.token &&
@@ -678,6 +755,27 @@
 
   /* ---------- tests ---------- */
 
+  async function refreshAddonEpg(button) {
+    var status = form.querySelector('[data-epg-status]');
+    if (status) { status.className = 'test-result'; status.textContent = 'Refreshing…'; }
+    button.disabled = true;
+    try {
+      var data = await api('/api/epg/refresh', { method: 'POST', body: '{}' });
+      if (status) {
+        status.className = 'test-result ok';
+        status.textContent = data && data.ok
+          ? ('Updated · ' + data.channels + ' channels · ' + data.augmented + ' with LCN')
+          : ('EPG error: ' + ((data && data.error) || 'unknown'));
+      }
+      toast('Add-on guide refreshed', 'ok');
+    } catch (err) {
+      if (status) { status.className = 'test-result bad'; status.textContent = err.message; }
+      toast('Could not refresh guide: ' + err.message, 'bad');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async function runTest(kind, button) {
     var result = form.querySelector('[data-test-result="' + kind + '"]');
     if (result) { result.className = 'test-result'; result.textContent = 'Testing…'; }
@@ -808,6 +906,14 @@
       markDirty();
       return;
     }
+    if (el.dataset && el.dataset.appField) {
+      var items = appItems();
+      var index = Number(el.dataset.appIndex);
+      if (items[index]) {
+        items[index][el.dataset.appField] = el.value;
+        markDirty();
+      }
+    }
   }
 
   function handleFormClick(event) {
@@ -820,6 +926,63 @@
     if (target.matches('[data-download]')) { downloadConfig(); return; }
     if (target.matches('[data-use-server]')) { useThisServer(); return; }
     if (target.matches('[data-copy-snippet]')) { copySnippet(); return; }
+    if (target.matches('[data-app-add]')) {
+      appItems().push({ id: '', name: '' });
+      markDirty();
+      render();
+      return;
+    }
+    if (target.matches('[data-app-remove]')) {
+      appItems().splice(Number(target.getAttribute('data-app-remove')), 1);
+      markDirty();
+      render();
+      return;
+    }
+    if (target.matches('[data-app-up]')) {
+      var up = Number(target.getAttribute('data-app-up'));
+      var upItems = appItems();
+      if (up > 0) {
+        var swapUp = upItems[up - 1];
+        upItems[up - 1] = upItems[up];
+        upItems[up] = swapUp;
+        markDirty();
+        render();
+      }
+      return;
+    }
+    if (target.matches('[data-epg-refresh]')) {
+      refreshAddonEpg(target);
+      return;
+    }
+    if (target.matches('[data-reset-field]')) {
+      var resetPath = target.getAttribute('data-reset-field');
+      var defaultValue = getPath(DEFAULTS, resetPath);
+      if (defaultValue === undefined) {
+        toast('No default for this setting', 'bad');
+        return;
+      }
+      var field = form.querySelector('[data-path="' + resetPath.replace(/"/g, '\\"') + '"]');
+      if (field) {
+        if (field.type === 'checkbox') field.checked = !!defaultValue;
+        else field.value = defaultValue == null ? '' : String(defaultValue);
+      }
+      setPath(state.config, resetPath, defaultValue);
+      markDirty();
+      toast('Reset to default', 'ok');
+      return;
+    }
+    if (target.matches('[data-app-down]')) {
+      var down = Number(target.getAttribute('data-app-down'));
+      var downItems = appItems();
+      if (down < downItems.length - 1) {
+        var swapDown = downItems[down + 1];
+        downItems[down + 1] = downItems[down];
+        downItems[down] = swapDown;
+        markDirty();
+        render();
+      }
+      return;
+    }
 
     var test = target.getAttribute('data-test');
     if (test) { runTest(test, target); return; }

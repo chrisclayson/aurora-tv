@@ -19,6 +19,12 @@
     lock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
     gear: '<circle cx="12" cy="12" r="3.1"/><path d="M19.4 14.2a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06A2 2 0 1 1 3.14 15.9l.06-.06a1.7 1.7 0 0 0 .34-1.87A1.7 1.7 0 0 0 2 12.94H2a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 1 1 6.1 3.14l.06.06a1.7 1.7 0 0 0 1.87.34H8.1A1.7 1.7 0 0 0 9.13 2V2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06A2 2 0 1 1 18.9 6.1l-.06.06a1.7 1.7 0 0 0-.34 1.87v.04A1.7 1.7 0 0 0 20 9.13h.04a2 2 0 1 1 0 4H20a1.7 1.7 0 0 0-1.56 1.07Z"/>',
     play: '<path d="M8 5.2v13.6L19 12 8 5.2Z"/>',
+    pause: '<path d="M9 5v14M15 5v14"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
+    next: '<path d="m6 5 8 7-8 7V5Z"/><path d="M18 5v14"/>',
+    previous: '<path d="m18 5-8 7 8 7V5Z"/><path d="M6 5v14"/>',
+    volume: '<path d="M4 9.5h4L13 5v14L8 14.5H4v-5Z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+    palette: '<path d="M12 3a9 9 0 0 0 0 18h1.4a2 2 0 0 0 1.4-3.4 2 2 0 0 1 1.4-3.4H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3Z"/><circle cx="7.5" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="14" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10" r="1" fill="currentColor" stroke="none"/>',
     back: '<path d="M14.5 5.5 8 12l6.5 6.5"/>',
     check: '<path d="m4.5 12.5 5 5L19.5 7"/>',
     chevron: '<path d="m9 5 7 7-7 7"/>',
@@ -26,9 +32,23 @@
     motion: '<path d="M3 12h2.4l2.2-6 3.2 12 2.4-8 1.6 4H21"/>',
     bolt: '<path d="M13 2 4.5 13.5H10l-1 8.5 8.5-11.5H12l1-8.5Z"/>',
     wifi: '<path d="M2.5 8.5a14 14 0 0 1 19 0M5.5 12a9.5 9.5 0 0 1 13 0M8.6 15.4a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19" r="1.2" fill="currentColor" stroke="none"/>',
+    thermometer: '<path d="M10 14.5V5.5a2 2 0 1 1 4 0v9a4 4 0 1 1-4 0Z"/><path d="M12 9v7"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/>',
+    cloud: '<path d="M7.5 18h9a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.3A3.5 3.5 0 0 0 7.5 18Z"/>',
+    partly: '<path d="M8 17.5h8.5a3.5 3.5 0 0 0 .3-7 4.8 4.8 0 0 0-9.2 1.1A3 3 0 0 0 8 17.5Z"/><path d="M17.5 3.5v1.5M21 7h1.5M20.2 4.8l1 1M14.8 4.8l-1 1M12 7h-1.5"/>',
+    rain: '<path d="M7.5 16.5h9a3.8 3.8 0 0 0 .4-7.6 5.3 5.3 0 0 0-10.2 1.2A3.4 3.4 0 0 0 7.5 16.5Z"/><path d="M8 19v2M12 19v2M16 19v2"/>',
+    snow: '<path d="M7.5 16.5h9a3.8 3.8 0 0 0 .4-7.6 5.3 5.3 0 0 0-10.2 1.2A3.4 3.4 0 0 0 7.5 16.5Z"/><path d="M8.5 20h.01M12 21h.01M15.5 20h.01"/>',
+    storm: '<path d="M7.5 16.5h9a3.8 3.8 0 0 0 .4-7.6 5.3 5.3 0 0 0-10.2 1.2A3.4 3.4 0 0 0 7.5 16.5Z"/><path d="m12.5 16-2 4h2.5l-1 3"/>',
+    fog: '<path d="M4 9h16M3 13h18M5 17h14"/>',
+    wind: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.1"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>',
-    dashboard: '<rect x="3.2" y="3.2" width="7.5" height="7.5" rx="1.6"/><rect x="13.3" y="3.2" width="7.5" height="4.6" rx="1.6"/><rect x="3.2" y="13.3" width="7.5" height="7.5" rx="1.6"/><rect x="13.3" y="10.4" width="7.5" height="10.4" rx="1.6"/>'
+    dashboard: '<rect x="3.2" y="3.2" width="7.5" height="7.5" rx="1.6"/><rect x="13.3" y="3.2" width="7.5" height="4.6" rx="1.6"/><rect x="3.2" y="13.3" width="7.5" height="7.5" rx="1.6"/><rect x="13.3" y="10.4" width="7.5" height="10.4" rx="1.6"/>',
+    bell: '<path d="M18 9a6 6 0 0 0-12 0c0 5-2 6-2 6h16s-2-1-2-6Z"/><path d="M10.3 19a2 2 0 0 0 3.4 0"/>',
+    apps: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/>',
+    flame: '<path d="M12 3.2c1.2 4.2-3.6 5.7-3.6 9.3a3.6 3.6 0 0 0 7.2 0c0-1.1-.4-2.1-1.1-3.1-.2 1.4-1.1 2.1-2 2.1-1.3 0-2-1-1.8-2.4.2-1.4 1.4-2.4 1.3-5.9Z"/><path d="M8.2 17.8a5.4 5.4 0 0 0 7.6 0"/>'
   };
 
   function icon(name, extraClass) {
@@ -36,6 +56,14 @@
     return '<svg class="ico ' + (extraClass || '') + '" viewBox="0 0 24 24" fill="none" ' +
       'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" ' +
       'aria-hidden="true">' + body + '</svg>';
+  }
+
+  function iconUrl(path) {
+    var value = String(path || '').trim();
+    if (!value) return '';
+    if (/^(https?:|data:|blob:|file:)/i.test(value)) return value;
+    if (value.charAt(0) === '/') return 'file://' + value;
+    return 'file:///' + value;
   }
 
   function qs(sel) { return document.querySelector(sel); }
@@ -81,8 +109,10 @@
     var home = qs('#screen-home');
     if (!home) return;
 
-    home.querySelector('#home-date').textContent = U.fmtDate(model.now || new Date()).toUpperCase();
-    home.querySelector('#home-title').textContent = greeting(model.now);
+    var homeDate = U.fmtDate(model.now || new Date()).toUpperCase();
+    if (model.festiveTag) homeDate += ' · ' + model.festiveTag;
+    home.querySelector('#home-date').textContent = homeDate;
+    home.querySelector('#home-title').textContent = model.greeting || greeting(model.now);
     home.querySelector('#home-sub').textContent = model.subtitle || '';
 
     var rail = home.querySelector('#tile-rail');
@@ -115,22 +145,98 @@
       });
     });
 
-    renderSensors(model.sensors || {});
+    var railWrap = home.querySelector('#rail-wrap');
+    if (railWrap) railWrap.classList.toggle('apps-open', !!model.appsOpen);
+    var appsRow = home.querySelector('#apps-row');
+    var appRail = home.querySelector('#app-rail');
+    if (appsRow) appsRow.hidden = !model.appsOpen;
+    if (appRail) {
+      appRail.innerHTML = !model.appsOpen ? '' : (model.apps || []).map(function (app) {
+        var source = iconUrl(app.icon);
+        return '<button type="button" class="app-tile" data-app="' + U.esc(app.id) + '" ' +
+          'aria-label="Open ' + U.esc(app.name) + '">' +
+          '<span class="app-tile-ico">' +
+          '<span class="app-tile-glyph">' + icon(app.iconName || 'apps') + '</span>' +
+          (source ? '<img class="app-tile-img" src="' + U.esc(source) + '" alt="">' : '') +
+          '</span>' +
+          '<span class="app-tile-name">' + U.esc(app.name) + '</span>' +
+          '</button>';
+      }).join('');
+      U.$$('#app-rail .app-tile-img').forEach(function (img) {
+        img.onerror = function () { this.style.display = 'none'; };
+      });
+      U.$$('#app-rail .app-tile').forEach(function (node) {
+        node.addEventListener('click', function () {
+          if (typeof model.onApp === 'function') model.onApp(node.getAttribute('data-app'));
+        });
+        node.addEventListener('mouseenter', function () {
+          focusElement(node, { scroll: false });
+          if (typeof model.onAppHover === 'function') model.onAppHover(node.getAttribute('data-app'));
+        });
+      });
+    }
+
+    renderSensors(model.sensors || {}, {
+      focus: model.focusRegion === 'sensors' ? model.sensorIndex : -1,
+      onSensor: model.onSensor,
+      onHover: model.onSensorHover
+    });
     renderStatus(model.status || {});
+    renderWeather(model.weather || {});
+    renderCalendar(model.calendar || {});
     updateClock(model.now || new Date());
-    applyFocus(model.focusId);
+    if (model.focusRegion === 'notifications') {
+      var notify = home.querySelector('#home-notify');
+      if (notify && !notify.hidden) focusElement(notify);
+      else applyFocus(model.focusId);
+    } else if (model.focusRegion === 'apps') {
+      applyFocus(model.appFocusId, true, 'app');
+    } else if (model.focusRegion === 'sensors') {
+      applySensorFocus(model.sensorIndex, true);
+    } else {
+      applyFocus(model.focusId);
+    }
   }
 
-  function applyFocus(id, scroll) {
+  function applyFocus(id, scroll, rail) {
     if (!id) return;
-    var node = qs('#tile-rail .tile[data-tile="' + id + '"]');
+    var node = rail === 'app'
+      ? qs('#app-rail .app-tile[data-app="' + id + '"]')
+      : qs('#tile-rail .tile[data-tile="' + id + '"]');
     if (node) focusElement(node, { scroll: !!scroll });
   }
 
-  function renderSensors(sensors) {
+  function renderSensors(sensors, options) {
+    options = options || {};
     var strip = qs('#sensor-strip');
     if (!strip) return;
     var items = [];
+
+    if (sensors.climate && sensors.climate.current != null) {
+      var climate = sensors.climate;
+      var unit = climate.unit || '°C';
+      var value = climate.current + unit;
+      if (climate.target != null) value += ' → ' + climate.target + unit;
+      var action = String(climate.action || '').toLowerCase();
+      var status = '';
+      var statusKind = '';
+      if (climate.state === 'off') { status = 'Off'; statusKind = 'off'; }
+      else if (action === 'idle') { status = 'Idle'; statusKind = 'idle'; }
+      else if (action) { status = action.charAt(0).toUpperCase() + action.slice(1); statusKind = 'active'; }
+      else if (climate.state === 'heat') { status = 'Heating'; statusKind = 'active'; }
+      else if (climate.state === 'cool') { status = 'Cooling'; statusKind = 'active'; }
+      else if (climate.state) { status = String(climate.state).charAt(0).toUpperCase() + String(climate.state).slice(1); statusKind = 'active'; }
+      items.push({
+        icon: 'thermometer',
+        label: 'Temperature',
+        value: value,
+        status: status,
+        statusKind: statusKind,
+        on: climate.state !== 'off' && climate.state !== 'unavailable',
+        kind: 'climate',
+        entityId: climate.id
+      });
+    }
 
     if (sensors.light) {
       var light = sensors.light;
@@ -138,16 +244,40 @@
       var brightness = light.brightness != null ? Math.round((light.brightness / 255) * 100) + '%' : '';
       items.push({
         icon: 'bulb',
-        label: light.name || 'Light',
+        label: 'Lights',
         value: light.state === 'unavailable' ? 'Unavailable' : (isOn ? ('On' + (brightness ? ' · ' + brightness : '')) : 'Off'),
-        on: isOn
+        status: '',
+        statusKind: '',
+        on: isOn,
+        kind: 'light',
+        entityId: light.id
       });
     }
+
     if (sensors.power) {
       var power = sensors.power;
-      var unit = power.unit || '';
-      var value = power.state === 'unavailable' ? 'Unavailable' : (power.state + (unit ? ' ' + unit : ''));
-      items.push({ icon: 'bolt', label: power.name || 'Power', value: value, on: power.state !== 'unavailable' });
+      var powerUnit = power.unit || '';
+      items.push({
+        icon: 'bolt',
+        label: 'Electricity Usage',
+        value: power.state === 'unavailable' ? 'Unavailable' : (power.state + (powerUnit ? ' ' + powerUnit : '')),
+        on: power.state !== 'unavailable',
+        kind: 'power',
+        entityId: power.id
+      });
+    }
+
+    if (sensors.gas) {
+      var gas = sensors.gas;
+      var gasUnit = gas.unit || '';
+      items.push({
+        icon: 'flame',
+        label: 'Gas Usage',
+        value: gas.state === 'unavailable' ? 'Unavailable' : (gas.state + (gasUnit ? ' ' + gasUnit : '')),
+        on: gas.state !== 'unavailable',
+        kind: 'gas',
+        entityId: gas.id
+      });
     }
 
     if (!items.length) {
@@ -158,12 +288,160 @@
       return;
     }
 
-    strip.innerHTML = items.slice(0, 4).map(function (item) {
-      return '<div class="sensor' + (item.on ? ' on' : '') + '">' +
+    var focus = typeof options.focus === 'number' ? options.focus : -1;
+    strip.innerHTML = items.slice(0, 4).map(function (item, index) {
+      var cls = 'sensor' + (item.on ? ' on' : '') + (index === focus ? ' focused' : '');
+      return '<button type="button" class="' + cls + '" data-sensor-index="' + index + '" ' +
+        'aria-label="' + U.esc(item.label + ': ' + item.value + (item.status ? ', ' + item.status : '')) + '">' +
         '<span class="sensor-ico">' + icon(item.icon) + '</span>' +
         '<span class="sensor-text"><b>' + U.esc(item.label) + '</b><small>' + U.esc(item.value) + '</small></span>' +
+        (item.status ? '<span class="sensor-status ' + U.esc(item.statusKind) + '">' + U.esc(item.status) + '</span>' : '') +
+        '</button>';
+    }).join('');
+
+    U.$$('#sensor-strip .sensor[data-sensor-index]').forEach(function (node) {
+      node.addEventListener('click', function () {
+        if (typeof options.onSensor === 'function') options.onSensor(Number(node.getAttribute('data-sensor-index')));
+      });
+      node.addEventListener('mouseenter', function () {
+        focusElement(node, { scroll: false });
+        if (typeof options.onHover === 'function') options.onHover(Number(node.getAttribute('data-sensor-index')));
+      });
+    });
+    if (focus >= 0) applySensorFocus(focus, false);
+  }
+
+  function applySensorFocus(index, scroll) {
+    var node = qs('#sensor-strip .sensor[data-sensor-index="' + index + '"]');
+    if (node) focusElement(node, { scroll: !!scroll });
+  }
+
+  function weatherIconName(condition) {
+    var value = String(condition || '').toLowerCase();
+    if (value === 'clear-night') return 'moon';
+    if (value === 'sunny' || value === 'clear') return 'sun';
+    if (value === 'partlycloudy') return 'partly';
+    if (value === 'cloudy') return 'cloud';
+    if (value === 'rainy' || value === 'pouring' || value === 'hail') return 'rain';
+    if (value === 'snowy' || value === 'snowy-rainy') return 'snow';
+    if (value === 'lightning' || value === 'lightning-rainy') return 'storm';
+    if (value === 'fog') return 'fog';
+    if (value === 'windy' || value === 'windy-variant') return 'wind';
+    return 'cloud';
+  }
+
+  function renderWeather(weather) {
+    var panel = qs('#home-weather');
+    if (!panel) return;
+    weather = weather || {};
+    var forecast = weather.forecast || [];
+    var slots = forecast.slice(0, 3);
+    if (!slots.length && (weather.temperature != null || weather.condition)) {
+      slots = [{ time: null, temperature: weather.temperature, condition: weather.condition, precipitation: null }];
+    }
+    if (!weather.available || !slots.length) {
+      panel.hidden = true;
+      panel.innerHTML = '';
+      return;
+    }
+    panel.hidden = false;
+    panel.innerHTML = slots.map(function (item) {
+      var temperature = item.temperature != null && isFinite(Number(item.temperature))
+        ? Math.round(Number(item.temperature)) + '°'
+        : '—';
+      var precipitation = item.precipitation != null && isFinite(Number(item.precipitation))
+        ? Math.round(Number(item.precipitation)) + '%'
+        : '—';
+      var time = item.time ? U.fmtTime(item.time) : 'Now';
+      return '<div class="weather-slot">' +
+        '<span class="weather-time">' + U.esc(time) + '</span>' +
+        '<span class="weather-symbol">' + icon(weatherIconName(item.condition || weather.condition)) + '</span>' +
+        '<span class="weather-temp">' + U.esc(temperature) + '</span>' +
+        '<span class="weather-rain">' + U.esc(precipitation) + '</span>' +
         '</div>';
     }).join('');
+  }
+
+  var CAL_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  function renderCalendar(calendar) {
+    var panel = qs('#home-calendar');
+    if (!panel) return;
+    if (!calendar.available) {
+      panel.hidden = true;
+      panel.innerHTML = '';
+      return;
+    }
+    panel.hidden = false;
+
+    var now = new Date();
+    var days = [];
+    var i;
+    for (i = 0; i < 3; i++) {
+      var date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      days.push({
+        date: date,
+        label: i === 0 ? 'Today' : (i === 1 ? 'Tomorrow' : CAL_DAYS[date.getDay()] + ' ' + U.fmtDateShort(date)),
+        events: []
+      });
+    }
+
+    function dayIndex(date) {
+      if (!(date instanceof Date) || isNaN(date.getTime())) return -1;
+      for (var d = 0; d < days.length; d++) {
+        if (days[d].date.getFullYear() === date.getFullYear() &&
+            days[d].date.getMonth() === date.getMonth() &&
+            days[d].date.getDate() === date.getDate()) return d;
+      }
+      return -1;
+    }
+
+    (calendar.events || []).forEach(function (event) {
+      if (!event || !(event.start instanceof Date) || isNaN(event.start.getTime())) return;
+      var index = dayIndex(event.start);
+      if (index === -1 && event.start < days[0].date && event.end > days[0].date) index = 0;
+      if (index === -1) return;
+      days[index].events.push(event);
+    });
+
+    var count = 0;
+    days.forEach(function (day) {
+      day.events.sort(function (a, b) { return a.start - b.start; });
+      count += day.events.length;
+    });
+
+    var html = '<div class="cal-head">' +
+      '<span class="cal-kicker">NEXT 3 DAYS</span>' +
+      '<span class="cal-count">' + (calendar.loading && !count ? '…' : count + (count === 1 ? ' event' : ' events')) + '</span>' +
+      '</div>';
+
+    if (!count && calendar.loading) {
+      html += '<div class="cal-empty">Loading calendar…</div>';
+    } else if (!count && calendar.error) {
+      html += '<div class="cal-empty">Calendar unavailable</div>';
+    } else if (!count) {
+      html += '<div class="cal-empty">No upcoming events</div>';
+    } else {
+      html += '<div class="cal-days">' + days.map(function (day) {
+        var rows = day.events.slice(0, 3).map(function (event) {
+          var time = event.allDay ? 'All day' : U.fmtTime(event.start);
+          var title = event.summary + (event.location ? ' — ' + event.location : '');
+          return '<div class="cal-event' + (event.allDay ? ' allday' : '') + '">' +
+            '<span class="cal-time">' + U.esc(time) + '</span>' +
+            '<span class="cal-title" title="' + U.esc(title) + '">' + U.esc(event.summary) + '</span>' +
+            '</div>';
+        }).join('');
+        if (!rows) rows = '<div class="cal-none">No events</div>';
+        else if (day.events.length > 3) {
+          rows += '<div class="cal-more">+' + (day.events.length - 3) + ' more</div>';
+        }
+        return '<section class="cal-day">' +
+          '<div class="cal-day-label">' + U.esc(day.label) + '</div>' + rows +
+          '</section>';
+      }).join('') + '</div>';
+    }
+
+    panel.innerHTML = html;
   }
 
   function renderStatus(status) {
@@ -679,6 +957,151 @@
     });
   }
 
+  function confirmSave(options) {
+    options = options || {};
+    closeModal(null);
+    return new Promise(function (resolve) {
+      var root = U.el('div', { 'class': 'modal-backdrop' });
+      root.innerHTML = '<div class="modal small" role="dialog" aria-modal="true">' +
+        '<div class="modal-head"><h2>' + U.esc(options.title || 'Save changes?') + '</h2>' +
+        '<p>' + U.esc(options.message || 'You have unsaved settings. Save them before leaving?') + '</p></div>' +
+        '<div class="modal-actions">' +
+        '<button class="btn ghost" id="modal-cancel">' + U.esc(options.cancelLabel || 'Cancel') + '</button>' +
+        '<button class="btn ghost" id="modal-discard">' + U.esc(options.discardLabel || 'Discard') + '</button>' +
+        '<button class="btn primary" id="modal-save">' + U.esc(options.saveLabel || 'Save') + '</button>' +
+        '</div></div>';
+      document.body.appendChild(root);
+      document.body.classList.add('modal-open');
+      modal = { root: root, resolve: resolve };
+      var cancel = root.querySelector('#modal-cancel');
+      var discard = root.querySelector('#modal-discard');
+      var save = root.querySelector('#modal-save');
+      var buttons = [cancel, discard, save];
+      function finish(value) { closeModal(value); }
+      cancel.addEventListener('click', function () { finish(null); });
+      discard.addEventListener('click', function () { finish('discard'); });
+      save.addEventListener('click', function () { finish('save'); });
+      root.addEventListener('mousedown', function (event) {
+        if (event.target === root) finish(null);
+      });
+      root.addEventListener('keydown', function (event) {
+        if (event.keyCode === 27 || event.keyCode === 10009) {
+          event.preventDefault();
+          event.stopPropagation();
+          finish(null);
+          return;
+        }
+        if (event.keyCode === 13) {
+          event.preventDefault();
+          event.stopPropagation();
+          var active = document.activeElement;
+          finish(active === cancel ? null : (active === discard ? 'discard' : 'save'));
+          return;
+        }
+        if (event.keyCode === 37 || event.keyCode === 39) {
+          event.preventDefault();
+          event.stopPropagation();
+          var index = buttons.indexOf(document.activeElement);
+          if (index < 0) index = 2;
+          var next = (index + (event.keyCode === 39 ? 1 : -1) + buttons.length) % buttons.length;
+          try { buttons[next].focus(); } catch (e) { /* ignore */ }
+        }
+      });
+      setTimeout(function () {
+        try { save.focus(); } catch (e) { /* ignore */ }
+      }, 60);
+    });
+  }
+
+  function energyGraph(options) {
+    options = options || {};
+    var points = (options.points || []).filter(function (point) {
+      return point && isFinite(point.v) && point.t && !isNaN(new Date(point.t).getTime());
+    });
+    if (points.length === 1) points.push({ t: points[0].t, v: points[0].v });
+    closeModal(null);
+    return new Promise(function (resolve) {
+      var W = 1000;
+      var H = 320;
+      var left = 42;
+      var right = 18;
+      var top = 22;
+      var bottom = 46;
+      var values = points.map(function (point) { return Number(point.v); });
+      var min = Math.min.apply(null, values);
+      var max = Math.max.apply(null, values);
+      if (min === max) { min -= 1; max += 1; }
+      var pad = (max - min) * 0.08;
+      min -= pad;
+      max += pad;
+      var plotW = W - left - right;
+      var plotH = H - top - bottom;
+      function xAt(i) { return left + (points.length <= 1 ? plotW : (i / (points.length - 1)) * plotW); }
+      function yAt(v) { return top + (1 - ((v - min) / (max - min))) * plotH; }
+      var line = points.map(function (point, i) {
+        return (i ? 'L' : 'M') + xAt(i).toFixed(2) + ' ' + yAt(point.v).toFixed(2);
+      }).join(' ');
+      var area = line + ' L' + xAt(points.length - 1).toFixed(2) + ' ' + (top + plotH) +
+        ' L' + xAt(0).toFixed(2) + ' ' + (top + plotH) + ' Z';
+      var color = options.color || '#60a5fa';
+      var grid = '';
+      [0, 0.25, 0.5, 0.75, 1].forEach(function (fraction) {
+        var y = top + fraction * plotH;
+        var value = max - fraction * (max - min);
+        grid += '<line x1="' + left + '" y1="' + y.toFixed(1) + '" x2="' + (W - right) +
+          '" y2="' + y.toFixed(1) + '" stroke="rgba(255,255,255,.08)" stroke-width="1"/>';
+        if (fraction === 0 || fraction === 0.5 || fraction === 1) {
+          grid += '<text x="6" y="' + (y + 5).toFixed(1) + '" fill="rgba(255,255,255,.35)" ' +
+            'font-size="18" font-family="inherit">' +
+            (Math.round(value * 10) / 10) + '</text>';
+        }
+      });
+      var now = points[points.length - 1].t;
+      var mid = points[Math.floor(points.length / 2)].t;
+      var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+        '<defs><linearGradient id="energyArea" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="' + color + '" stop-opacity=".38"/>' +
+        '<stop offset="1" stop-color="' + color + '" stop-opacity=".015"/>' +
+        '</linearGradient></defs>' +
+        grid +
+        '<path d="' + area + '" fill="url(#energyArea)"/>' +
+        '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="4" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<circle cx="' + xAt(points.length - 1).toFixed(2) + '" cy="' + yAt(points[points.length - 1].v).toFixed(2) +
+        '" r="7" fill="' + color + '" stroke="#fff" stroke-width="2"/>' +
+        '</svg>';
+      var title = options.title || 'Energy usage';
+      var subtitle = options.subtitle || 'Last 24 hours';
+      var summaryValue = options.summaryValue || '';
+      var summaryLabel = options.summaryLabel || '';
+      var root = U.el('div', { 'class': 'modal-backdrop' });
+      root.innerHTML = '<div class="modal wide energy-modal" role="dialog" aria-modal="true">' +
+        '<div class="energy-head"><div><p class="energy-eyebrow">ENERGY</p><h2>' + U.esc(title) + '</h2>' +
+        '<p>' + U.esc(subtitle) + '</p></div>' +
+        '<div class="energy-summary"><b>' + U.esc(summaryValue) + '</b><small>' + U.esc(summaryLabel) + '</small></div></div>' +
+        '<div class="energy-chart">' + svg + '</div>' +
+        '<div class="energy-axis"><span>' + U.esc(U.fmtTime(points[0].t)) + '</span>' +
+        '<span>' + U.esc(U.fmtTime(mid)) + '</span><span>' + U.esc(U.fmtTime(now)) + '</span></div>' +
+        '<div class="modal-actions"><button class="btn primary" id="energy-close">Close</button></div></div>';
+      document.body.appendChild(root);
+      document.body.classList.add('modal-open');
+      modal = { root: root, resolve: resolve };
+      var close = root.querySelector('#energy-close');
+      setTimeout(function () { try { close.focus(); } catch (e) { /* ignore */ } }, 60);
+      close.addEventListener('click', function () { closeModal(true); });
+      root.addEventListener('mousedown', function (event) {
+        if (event.target === root) closeModal(true);
+      });
+      root.addEventListener('keydown', function (event) {
+        if (event.keyCode === 27 || event.keyCode === 10009 || event.keyCode === 13) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeModal(true);
+        }
+      });
+    });
+  }
+
   function infoPanel(title, lines) {
     closeModal(null);
     return new Promise(function (resolve) {
@@ -749,6 +1172,7 @@
 
   A.UI = {
     icon: icon,
+    iconUrl: iconUrl,
     showScreen: showScreen,
     focusElement: focusElement,
     clearFocus: clearFocus,
@@ -756,6 +1180,8 @@
     renderHome: renderHome,
     applyFocus: applyFocus,
     renderSensors: renderSensors,
+    applySensorFocus: applySensorFocus,
+    renderWeather: renderWeather,
     renderStatus: renderStatus,
     updateClock: updateClock,
     renderGuide: renderGuide,
@@ -770,6 +1196,8 @@
     editor: openEditor,
     editorKey: editorKey,
     confirm: confirm,
+    confirmSave: confirmSave,
+    energyGraph: energyGraph,
     infoPanel: infoPanel,
     showSetupQR: showSetupQR,
     hideSetupQR: hideSetupQR,

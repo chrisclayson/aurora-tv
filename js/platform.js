@@ -86,6 +86,9 @@
           info.model = build.model || '';
           info.firmware = build.firmware || build.buildVersion || '';
           info.version = build.version || '';
+          if (A.App && A.App.onModelReady) {
+            setTimeout(function () { A.App.onModelReady(); }, 0);
+          }
         }, function (err) { noteError('systeminfo BUILD', err); });
 
         tizen.systeminfo.getPropertyValue('DISPLAY', function (display) {
@@ -177,6 +180,24 @@
         reject(e);
       }
     });
+  }
+
+  function supportsArtMode() {
+    return /LS03/i.test(String(info.model || ''));
+  }
+
+  function launchArtMode() {
+    if (!caps.appLaunch) return Promise.reject(new Error('App launch is not available here'));
+    var ids = ['org.tizen.art-app', 'com.samsung.tv.home.art', 'com.samsung.tv.coba.art'];
+    function attempt(index) {
+      if (index >= ids.length) {
+        return Promise.reject(new Error('The Art Mode app is not available'));
+      }
+      return launchApp(ids[index]).catch(function () {
+        return attempt(index + 1);
+      });
+    }
+    return attempt(0);
   }
 
   function tvCall(method, args, timeoutMs) {
@@ -283,7 +304,13 @@
     });
   }
 
-  function listApps() {
+  var appsCache = { at: 0, items: null };
+  var APPS_CACHE_MS = 5 * 60 * 1000;
+
+  function listApps(force) {
+    if (!force && appsCache.items && Date.now() - appsCache.at < APPS_CACHE_MS) {
+      return Promise.resolve(appsCache.items.slice());
+    }
     return new Promise(function (resolve) {
       if (!caps.appInfo) return resolve([]);
       var done = false;
@@ -297,9 +324,16 @@
           if (done) return;
           done = true;
           clearTimeout(timer);
-          resolve((apps || []).map(function (app) {
-            return { id: app.id, name: app.name || app.id };
-          }));
+          var list = (apps || []).map(function (app) {
+            return {
+              id: app.id,
+              name: app.name || app.id,
+              icon: app.iconPath || '',
+              show: app.show !== false
+            };
+          });
+          appsCache = { at: Date.now(), items: list };
+          resolve(list.slice());
         }, function (err) {
           if (done) return;
           done = true;
@@ -979,6 +1013,8 @@
     info: info,
     init: init,
     launchApp: launchApp,
+    launchArtMode: launchArtMode,
+    supportsArtMode: supportsArtMode,
     switchSource: switchSource,
     launchTvSettings: launchTvSettings,
     listApps: listApps,

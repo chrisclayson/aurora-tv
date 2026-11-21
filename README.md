@@ -11,14 +11,27 @@ designed to sit on top of the TV's own input handling rather than pretending
 Tizen is something it is not.
 
 ```
-HDMI 1   HDMI 2   HDMI 3   HDMI 4   Live TV   TV Guide   Home Assistant   Music   Cameras   Settings   TV Settings
+HDMI 1   HDMI 2   HDMI 3   HDMI 4   Live TV   TV Guide   Apps   Home Assistant   Music   Cameras   Settings   Samsung Hub   TV Settings
 ```
+
+The **Apps** tile appears between TV Guide and Home Assistant only when at least
+one app is configured.
 
 - Focus-first TV UI (remote arrows, OK, Back) with a web-preview fallback.
 - HDMI 1–4, Live TV, configurable labels and native input switching.
 - HDMI tiles appear only for ports reported as connected; detection is refreshed every 30 s.
-- XMLTV guide with a 3-hour grid, channel rows, now-line and programme details.
-- Native Home Assistant entity dashboard with named pages and remote-friendly widgets.
+- XMLTV guide with a 3-hour grid, channel rows, now-line and programme details —
+  or launch the TV's native guide instead.
+- **Apps row**: select the Apps tile to shrink the main menu and show configured
+  TV apps (Netflix, Apple TV, etc.); Back restores the main menu. App tiles use
+  each app's own TV icon when one is available and fall back to a generic icon.
+- **Home Assistant notifications**: a bell beside the weather shows the unread
+  count and opens a full-screen notification list with dismiss and dismiss-all.
+- Native Home Assistant entity dashboard with named pages, large page pills and remote-friendly widgets.
+- **Detailed HA controls**: hold **OK** on a widget for climate, light, media player, select, cover or number controls.
+- **Home calendar**: the next three days of events from every Home Assistant calendar entity.
+- **Weather and climate**: indoor temperature on the sensor strip and a three-hour outdoor forecast beside the clock.
+- **Interactive home sensors**: Temperature, Lights, Electricity Usage and Gas Usage. Navigate down to them, press OK to toggle climate/lights, or open a 24-hour energy graph; hold OK on climate or lights for their full controls.
 - Add or remove entities by area directly on the TV.
 - Music screen for a configured HA media player: album art, track, album, artist, play/pause, previous/next and Music Assistant playlist browsing.
 - Cameras tile with live HLS/RTSP feeds; Channel Up/Down switches cameras while watching.
@@ -26,7 +39,12 @@ HDMI 1   HDMI 2   HDMI 3   HDMI 4   Live TV   TV Guide   Home Assistant   Music 
   lets you configure the app from any browser on the LAN — no separate server.
 - **First-run setup QR**: the TV shows a scannable URL with the access token
   already embedded; the browser page opens pre-authenticated.
+- **Samsung Hub tile**: launches the TV's native Samsung Hub app (`com.samsung.tv.csfs`).
 - **TV Settings tile**: opens the TV's native picture, sound and network menu.
+- **Art Mode tile**: on supported The Frame models, opens the TV's native Art Mode app.
+- **Festive mode**: a green, red and gold seasonal theme from 1 December to
+  6 January, with fairy lights, a Santa hat, a Christmas countdown and an
+  On/Off override in Settings for previewing.
 - **Translucent home overlay**: the current TV/HDMI source stays visible behind
   a full-screen translucent launcher; the guide keeps a compact top-right
   native preview.
@@ -39,19 +57,29 @@ Home, guide, settings, native Home Assistant widgets, entity browser and cameras
 
 ![Aurora home](docs/home.png "Aurora home")
 ![Aurora with Home Assistant sensors](docs/home-sensors.png "Aurora with Home Assistant sensors")
+![24-hour energy graph](docs/energy-graph.png "24-hour electricity and gas usage")
 ![TV guide](docs/guide.png "TV guide")
+![Festive mode](docs/home-festive.png "Festive mode from 1 December to 6 January")
+![Christmas Day](docs/home-christmas.png "Christmas Day greeting")
+![Apps row](docs/home-apps.png "Apps row under the compact main menu")
+![Home Assistant notifications](docs/notifications.png "Home Assistant notifications")
 ![Settings](docs/settings.png "Settings")
+![Choose the native guide app](docs/settings-guide-app.png "Choose the native guide app from installed apps")
+![Unsaved settings prompt](docs/settings-save-prompt.png "Save or discard unsaved settings")
 ![Home Assistant entity settings](docs/settings-ha.png "Home Assistant entity settings")
 ![Full-screen setting editor](docs/setting-editor.png "Full-screen setting editor")
 ![Home Assistant entity picker](docs/entity-picker.png "Entity picker")
 ![Web entity picker](docs/config-ui-picker.png "Web entity picker")
 ![Native Home Assistant](docs/ha-native.png "Native Home Assistant entity dashboard")
+![Climate detail controls](docs/ha-detail-climate.png "Climate detail controls")
+![Media player detail controls](docs/ha-detail-media.png "Media player detail controls")
 ![Home Assistant entity browser](docs/ha-browser.png "Browse entities by area")
 ![Home Assistant pages](docs/ha-pages.png "Named widget pages")
 ![Music](docs/music.png "Music now playing")
 ![Music Assistant](docs/music-browse.png "Browse Music Assistant playlists")
 ![Cameras](docs/cameras.png "Camera list")
 ![Remote web configuration](docs/config-ui.png "Optional LAN configuration server")
+![Web apps menu configuration](docs/config-ui-apps.png "Configure apps by name and Tizen app ID")
 ![On-TV configuration](docs/config-ui-tv.png "Served by the TV on port 8099")
 ![First-run setup QR](docs/setup-qr.png "First-run setup QR")
 
@@ -72,7 +100,7 @@ Aurora is therefore built as a **kiosk-style launcher app**:
 | Start automatically on power-on | Not supported on retail firmware | Use hotel/standalone mode if your TV exposes it, otherwise launch from the Home bar. |
 | Replace the Samsung launcher | Not possible on retail firmware | No supported API. Do not expect the Home key to open Aurora. |
 | Switch to HDMI | TVWindow | `tizen.tvwindow.setSource()` changes the main source behind the translucent home overlay; Back returns to it. |
-| Tune Live TV | Model/certificate-dependent | Optional native `tizen.tvchannel` tune, then TVWindow selects the TV source. |
+| Tune Live TV | Model/certificate-dependent | Native `tizen.tvchannel` tune when permitted, or HA `media_player.play_media` channel selection as a fallback. |
 | Power the TV off/on | Needs Home Assistant | The web app cannot power off its own TV. Home Assistant can control a configured `media_player`. |
 | Show Home Assistant while watching HDMI | Only while Aurora is foreground | Tizen gives no overlay API over other apps. Open the Home Assistant tile to show the native widgets. |
 | Control the TV while Aurora is suspended | Via Home Assistant | Tizen suspends the web app; Home Assistant talks to the TV directly. |
@@ -290,10 +318,20 @@ Two ways, in order of precedence:
 2. **`config.json`** in the widget (used as the seed on first run or after a
    reset).
 
+Fresh profiles default the Home Assistant URL to
+`http://homeassistant.local:8123` and the XMLTV URL to
+`http://homeassistant.local:8090/epg.xml`. The add-on publishes that guide on
+the shared port.
+
 The Settings screen exposes the useful fields; `config.json` is the fastest way
 to provision a TV without typing on a remote.
 
-Settings text fields open a full-screen editor instead of a pop-up dialog. The
+Settings text fields open a full-screen editor instead of a pop-up dialog.
+Press the **blue key** on any setting with a built-in default to reset that
+individual item. The web configuration UI shows a small **Reset** control beside
+each field that has a default.
+
+The
 TV keyboard takes the arrow keys while the field is focused; press **Back** to
 close the keyboard and select **Cancel**. **Left/Right** moves between Cancel
 and Save, **Up** returns to the text field, and **OK** activates the focused
@@ -333,13 +371,24 @@ Example seed:
     "tvEntity": "media_player.living_room_tv",
     "musicEntity": "media_player.music_assistant",
     "lightEntity": "light.living_room_lamp",
-    "powerEntity": "sensor.tv_plug_power"
+    "climateEntity": "climate.living_room",
+    "weatherEntity": "weather.home",
+    "powerEntity": "sensor.tv_plug_power",
+    "gasEntity": "sensor.gas_meter"
   },
   "epg": {
-    "xmltvUrl": "http://epg.local:8080/xmltv.xml",
+    "xmltvUrl": "http://homeassistant.local:8090/epg.xml",
     "demo": true,
     "refreshMinutes": 60,
-    "horizonHours": 3
+    "horizonHours": 3,
+    "nativeGuide": false,
+    "nativeGuideAppId": ""
+  },
+  "apps": {
+    "items": [
+      { "id": "3201907018807", "name": "Netflix" },
+      { "id": "3201807016597", "name": "Apple TV" }
+    ]
   },
   "sources": {
     "hdmi1": { "label": "HDMI 1", "sub": "Apple TV", "appId": "", "haSource": "HDMI1" },
@@ -350,7 +399,8 @@ Example seed:
   },
   "ui": {
     "lastExternal": "hdmi2",
-    "overlayTimeoutMs": 3500
+    "overlayTimeoutMs": 3500,
+    "festiveMode": "auto"
   },
   "remoteConfig": {
     "enabled": false,
@@ -458,8 +508,12 @@ installed directly as a local add-on:
 2. Open **Settings → Add-ons → Add-on store**, refresh, install **Aurora TV
    Configuration**.
 3. Set `config_token` (recommended) and `public_url` (for example
-   `http://<HA-IP>:8090`) in the add-on options, then start it.
-4. Open the **Aurora TV** sidebar panel, or use `http://<HA-IP>:8090/`.
+   `http://homeassistant.local:8090`) in the add-on options. The EPG options
+   `epg_region`, `epg_source_url`, `epg_lcn_url` and `epg_refresh_minutes`
+   control the hourly UK Freeview guide. Then start it.
+4. Open the **Aurora TV** sidebar panel, or use
+   `http://homeassistant.local:8090/`. The add-on publishes port **8090** on the
+   same LAN address as Home Assistant, so TVs can reach both services by name.
 
 Profiles are stored in `/data/aurora/` inside the add-on container and survive
 updates. An example profile is included in `config-server/data/example.json`;
@@ -489,12 +543,19 @@ when prompted.
 
 - `config-server/data/` contains the tracked example profile. Live per-TV profiles are git-ignored.
 - Use **Add device** to create more profiles (copying an existing one).
-- Edit Home Assistant, guide, input labels/IDs and remote settings in the
-  browser, then **Save changes**.
+- Edit Home Assistant, appearance, guide, apps, input labels/IDs and remote
+  settings in the browser, then **Save changes**. The web UI can add apps by
+  name and Tizen app ID and reorder them; the TV's Settings → Apps menu lists
+  installed apps for selection.
+- Individual fields with defaults show a **Reset** control.
+- The **TV guide** card shows the add-on's `/epg.xml` URL and a **Refresh
+  add-on guide** button.
 - **Download config.json** produces a ready bootstrap file with the remote URL
   and token already filled in.
 - **Test Home Assistant** and **Test XMLTV** validate the endpoints from the
   server side, avoiding browser CORS issues.
+- Leaving Settings with unsaved changes asks whether to **Save**, **Discard** or
+  stay and keep editing.
 
 ### One-time bootstrapping on the TV
 
@@ -539,6 +600,7 @@ All endpoints except `/api/health` require the token as
 | `POST` | `/api/test/ha` | `{baseUrl,token}` |
 | `POST` | `/api/ha/entities` | `{baseUrl,token}` → entity names, states and device classes for the picker |
 | `POST` | `/api/test/xmltv` | `{url}` |
+| `GET` | `/epg.xml` | Public UK Freeview XMLTV with `<lcn>` numbers |
 | `GET` | `/api/health` | Unauthenticated liveness check |
 
 The TV request is a simple cross-origin GET; the server answers CORS preflight
@@ -593,6 +655,8 @@ widgets:
 - **Left/Right/Up/Down** move focus.
 - **OK** toggles lights, switches, fans, covers, locks, scenes, scripts and
   buttons; sensors open a details panel.
+- **Hold OK** on a widget opens the detailed control screen when the entity has
+  controls beyond a simple on/off toggle.
 - **CH Up/Down** changes page.
 - **Back** returns home.
 
@@ -603,6 +667,62 @@ registries are unavailable, Aurora falls back to a flat list of all entities.
 
 Use **Pages** to create, open, rename (red key) or delete (blue key) named
 pages. Pages and widgets are stored in Aurora's config, not in HA dashboards.
+
+Hold **OK** on a widget to open its detailed controls:
+
+- **Climate** — current and target temperature, HVAC mode, preset, fan speed
+  and swing mode.
+- **Light** — brightness, colour palette, colour temperature and effects.
+- **Media player** — supported previous, play/pause, stop and next actions,
+  volume and mute, source selection, plus the current track and album art when
+  provided.
+- **Select / input_select** — option menu; **OK** cycles to the next option.
+- **Cover** — position when supported.
+- **Number / input_number** — value adjustment.
+
+Use **Up/Down** to move between controls, **Left/Right** to adjust or cycle, and
+**OK** to change the focused control. The detail screen is only opened when the
+entity has controls beyond the basic on/off toggle; a plain switch shows a short
+notice instead.
+
+### Notifications
+
+Persistent notifications from Home Assistant appear as a bell beside the
+weather with a count badge. Press **Up** from the tile rail to focus the bell,
+then **OK** to open the notification list. **Up/Down** move between
+notifications, **OK** dismisses the focused notification, the **blue key** or
+the **Dismiss all** row clears every notification, and **Back** returns home.
+The bell is hidden when there are no notifications.
+
+### Calendar
+
+The home screen shows a **NEXT 3 DAYS** panel with events from every
+`calendar.*` entity in Home Assistant. It calls `calendar.get_events` for all
+calendars, groups the events by local day (Today, Tomorrow, then the next day),
+and shows up to three events per day with a “+N more” line. All-day events are
+marked **All day**.
+
+The panel refreshes when Home Assistant reconnects, when the home screen is
+reopened, and every 15 minutes; stale data older than five minutes is refreshed.
+If there are no calendar entities, the panel is hidden. It is display-only, so
+remote focus stays on the main tiles.
+
+### Weather and climate
+
+Set **Climate entity** to a `climate.*` entity to show its
+`current_temperature` in the home sensor strip beside the light and power
+tiles. Set **Weather entity** to a `weather.*` entity to show the next three
+hourly forecasts in the top-right corner beside the clock:
+
+- hour label
+- condition symbol (sun, cloud, rain, snow, storm, fog or wind)
+- forecast temperature
+- precipitation probability
+
+The forecast comes from Home Assistant’s `weather.get_forecasts` action with
+`type: hourly`. If hourly forecasts are unavailable, the panel falls back to the
+weather entity’s current condition and temperature. Both settings also have
+**Choose** pickers in the web configuration UIs.
 
 ### Music
 
@@ -655,11 +775,69 @@ If you use HTTPS for HA, use a certificate the TV trusts. TV apps run from
 Set these in Settings (or `config.json`):
 
 - `lightEntity` — any `light.*`; shows on/off/brightness.
-- `powerEntity` — any `sensor.*` with a power/energy unit.
+- `climateEntity` — any `climate.*`; shows `current_temperature`.
+- `weatherEntity` — any `weather.*`; shows the next three hourly forecasts
+  beside the clock.
+- `powerEntity` — electricity power or energy sensor; shown as **Electricity Usage**.
+- `gasEntity` — gas meter or usage sensor; shown as **Gas Usage** beside electricity.
 - `tvEntity` — a `media_player.*` for the Samsung TV. Enables source selection
   and power-off fallbacks through Home Assistant.
 
-The light/power states are shown in the sensor strip.
+The sensor strip shows four items when configured:
+
+- **Temperature** — current and target temperature, plus **Idle**, **Heating**,
+  **Cooling** or **Off**.
+- **Lights** — on/off and brightness.
+- **Electricity Usage** — the electricity sensor value.
+- **Gas Usage** — the gas sensor value.
+
+Press **Down** from the tile rail to focus the strip. **Left/Right** moves
+between items. **OK** toggles climate or lights; on electricity or gas it opens
+a 24-hour usage graph. **Hold OK** on climate or lights opens the full entity
+controls. **Back** returns to the tiles.
+
+---
+
+## Art Mode
+
+On The Frame (`LS03` models, including the 2020 and 2023 32-inch Frame TVs), an
+**Art Mode** tile appears next to TV Settings. Selecting it launches the TV's
+built-in Art Mode app (`org.tizen.art-app`). The tile is hidden on models that
+do not support Art Mode.
+
+Aurora detects support from the TV model reported by `tizen.systeminfo`, with
+the configured `model` as a fallback. Launching uses the standard Tizen
+application API, so it works without any extra partner privileges.
+
+---
+
+## Festive mode
+
+Festive mode turns on automatically from **1 December through 6 January** and
+switches off afterwards. It adds:
+
+- a deep green, red and gold ambient background and recoloured tiles;
+- small twinkly fairy lights along the top of the screen;
+- subtle falling snow behind the UI, with occasional larger, elaborate flakes;
+- a Santa hat in the top-right corner;
+- warm gold focus rings, brand mark and panel borders;
+- a small “❄ Merry Christmas” or “❄ Happy New Year” tag in the home date line;
+- a **countdown to Christmas** in the title bar (“23 more sleeps 🎁”), which
+  disappears on Christmas Day;
+- on **25 December** only, the usual “Good morning/afternoon/evening”
+  salutation is replaced with **Merry Christmas**.
+
+Text, focus and contrast are unchanged, so the launcher stays fully readable.
+
+Set `ui.festiveMode` to:
+
+- `auto` — the default seasonal behaviour;
+- `on` — keep it on for testing (for example in November);
+- `off` — disable it entirely.
+
+Change it in **Settings → Appearance → Festive mode**, or in the **Appearance**
+card of either web configuration UI. The setting is checked again at midnight,
+so a long-running app updates itself.
 
 ---
 
@@ -673,8 +851,9 @@ The HDMI tiles and the Live TV tile use the TV's native paths:
    TV window, so the menu stays over the new input. Press **Back** to close the
    menu and watch the input full-screen. This is the primary path for HDMI 1–4
    and Live TV.
-2. For Live TV, if `livetv.defaultChannel` is set and `tizen.tvchannel` is
-   available, Aurora tunes that channel before selecting the TV source.
+2. For Live TV, if `livetv.defaultChannel` is set, Aurora tries
+   `tizen.tvchannel` and then HA channel selection before selecting the TV
+   source.
 3. **B2B input API** (`b2bapis.b2bcontrol.setInputSource`) when the TV exposes
    it.
 4. **Tizen app launch** as a last fallback. Live TV uses
@@ -744,12 +923,53 @@ needed beyond `application.launch`. If the tile does nothing, check
 
 ---
 
+## Apps menu
+
+The Apps tile is hidden until at least one app is configured. Use **Settings →
+Apps menu** on the TV to choose from the installed apps:
+
+- **OK** enables or disables the focused app.
+- **Left/Right** moves an enabled app up or down in the home row.
+- The **red key** or the **Search apps** row filters by app name or ID; choose
+  **Clear search** to show everything again.
+- Service-only apps (the TV reports `show: false`) are excluded from the list.
+- App tiles and the configuration list use each app's own icon from
+  `getAppsInfo().iconPath` when the TV allows the image to load, with a generic
+  fallback otherwise.
+- **Add app ID manually** accepts a Tizen application ID for apps that are not
+  enumerated.
+
+Aurora caches the installed-app list for five minutes. The app picker always
+refreshes it, so a newly installed app appears the next time you open Settings.
+
+The web configuration UI can also add apps by name and ID, remove them and
+reorder them. It cannot read the TV's installed-app list or local icon files;
+use the on-TV picker for that.
+
+---
+
 ## TV guide
 
+- Set **Native TV Guide app** in Settings (or `epg.nativeGuide: true`) to launch
+  the TV's built-in guide instead of the XMLTV grid. XMLTV remains the default.
+- Use **Native guide app** to choose the guide from the TV's installed apps. The
+  picker supports the same icons and red-key search as the Apps menu, plus an
+  **Automatic** option. Aurora uses `epg.nativeGuideAppId` when set; otherwise
+  it looks for the installed Samsung EPG app. If the native guide cannot be
+  launched, Aurora falls back to the XMLTV grid.
+- The Home Assistant add-on publishes a UK Freeview XMLTV feed at
+  `http://homeassistant.local:8090/epg.xml`, refreshed hourly and augmented with
+  Freeview `<lcn>` values. Configure the region and source URLs in the add-on
+  options.
 - Without `epg.xmltvUrl`, Aurora generates a clearly marked **demo guide** with
   invented channels and programmes. It is decorative but fully navigable.
 - With XMLTV, the guide loads the file, parses `<channel>`/`<programme>`, and
   keeps roughly the last 12 h / next 7 days.
+- Channels are sorted by the XMLTV `<lcn>` value, so the guide follows the
+  broadcast LCN order used by the TV. If `<lcn>` is missing, Aurora also
+  recognises a leading numeric channel ID such as `101.uk` as the LCN (this is
+  what `tv_grab_uk_freeview` produces when configured to use Freeview channel
+  numbers). Otherwise the XMLTV document order is preserved.
 - The guide endpoint must send `Access-Control-Allow-Origin` for the TV
   (`file://` origin is `null`). A typical nginx line:
 
@@ -757,9 +977,13 @@ needed beyond `application.launch`. If the tile does nothing, check
 add_header Access-Control-Allow-Origin *;
 ```
 
-- Selecting a programme tries `tizen.tvchannel` first (partner privilege). If
-  tuning is unavailable, it opens Live TV. Demo channels are not real numbers;
-  on a TV they open Live TV.
+- Selecting a programme tunes the channel. If Home Assistant has a TV
+  `media_player` configured, Aurora first calls `media_player.play_media` with
+  `media_content_type: channel` (the Samsung TV integration's channel
+  selection). If that is unavailable or fails, it tries native
+  `tizen.tvchannel.tune`; if that is not permitted by the TV certificate, it
+  opens Live TV without changing channel. Demo channels are not real numbers;
+  on a TV they simply open Live TV.
 
 ---
 

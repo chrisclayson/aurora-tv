@@ -27,6 +27,13 @@ const DATA_DIR = path.resolve(process.env.AURORA_CONFIG_DATA || path.join(__dirn
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_BODY = 1024 * 1024;
 const DEVICE_ID = /^[a-z0-9][a-z0-9_-]{0,40}$/;
+const EPG = require('./epg').create({
+  region: process.env.AURORA_EPG_REGION || 'uk',
+  sourceUrl: process.env.AURORA_EPG_SOURCE_URL || '',
+  lcnUrl: process.env.AURORA_EPG_LCN_URL || '',
+  refreshMinutes: process.env.AURORA_EPG_REFRESH_MINUTES || 60,
+  cachePath: path.join(DATA_DIR, 'epg-cache.xml')
+});
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -290,6 +297,26 @@ const server = http.createServer(async function (req, res) {
     return res.end(body);
   }
 
+  if (url.pathname === '/epg.xml' || url.pathname === '/epg') {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { 'Content-Type': 'text/plain' });
+      return res.end('Method not allowed');
+    }
+    if (!EPG.xml) {
+      return json(res, 503, { error: EPG.error || 'The EPG has not been loaded yet' });
+    }
+    const body = EPG.xml;
+    res.writeHead(200, {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Content-Length': Buffer.byteLength(body),
+      'Cache-Control': 'public, max-age=300',
+      'X-Aurora-EPG-Updated': new Date(EPG.updated).toISOString(),
+      'X-Aurora-EPG-Region': EPG.region
+    });
+    if (req.method === 'HEAD') return res.end();
+    return res.end(body);
+  }
+
   if (!url.pathname.startsWith('/api/')) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, { 'Content-Type': 'text/plain' });
@@ -415,6 +442,19 @@ const server = http.createServer(async function (req, res) {
       }
     }
 
+    if (url.pathname === '/api/epg/status' && req.method === 'GET') {
+      return json(res, 200, EPG.status());
+    }
+
+    if (url.pathname === '/api/epg/refresh' && req.method === 'POST') {
+      try {
+        await EPG.refresh();
+        return json(res, 200, EPG.status());
+      } catch (err) {
+        return json(res, 502, EPG.status());
+      }
+    }
+
     if (url.pathname === '/api/test/xmltv' && req.method === 'POST') {
       const body = parseJson(await readBody(req)) || {};
       try {
@@ -434,6 +474,8 @@ const server = http.createServer(async function (req, res) {
 server.listen(PORT, HOST, function () {
   log('Aurora config server listening on', HOST + ':' + PORT);
   log('data directory:', DATA_DIR);
+  log('EPG feed:', 'http://' + (HOST === '0.0.0.0' ? 'homeassistant.local' : HOST) + ':' + PORT + '/epg.xml');
+  EPG.start();
   if (!TOKEN) log('WARNING: AURORA_CONFIG_TOKEN is not set; anyone on the LAN can read and write configs (including HA tokens).');
   Object.keys(os.networkInterfaces()).forEach(function (name) {
     (os.networkInterfaces()[name] || []).forEach(function (netif) {

@@ -5,7 +5,7 @@ window.AURORA_SEED = {
   "model": "",
   "ha": {
     "enabled": false,
-    "baseUrl": "",
+    "baseUrl": "http://homeassistant.local:8123",
     "token": "",
     "tvEntity": "",
     "lightEntity": "",
@@ -18,13 +18,18 @@ window.AURORA_SEED = {
       }
     ],
     "currentPage": "home",
-    "musicEntity": ""
+    "musicEntity": "",
+    "climateEntity": "",
+    "weatherEntity": "",
+    "gasEntity": ""
   },
   "epg": {
-    "xmltvUrl": "",
+    "xmltvUrl": "http://homeassistant.local:8090/epg.xml",
     "demo": true,
     "refreshMinutes": 60,
-    "horizonHours": 3
+    "horizonHours": 3,
+    "nativeGuide": false,
+    "nativeGuideAppId": ""
   },
   "sources": {
     "hdmi1": {
@@ -65,7 +70,8 @@ window.AURORA_SEED = {
   "ui": {
     "lastExternal": "livetv",
     "dashboardDuration": 30,
-    "overlayTimeoutMs": 3500
+    "overlayTimeoutMs": 3500,
+    "festiveMode": "auto"
   },
   "remoteConfig": {
     "enabled": false,
@@ -76,5 +82,8 @@ window.AURORA_SEED = {
   "localServer": {
     "enabled": true,
     "token": ""
+  },
+  "apps": {
+    "items": []
   }
 };

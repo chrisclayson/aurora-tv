@@ -630,7 +630,7 @@ code {
 }
 
 .picker-card {
-  width: min(760px, 92vw);
+  width: min(1200px, 92vw);
   max-height: 84vh;
   display: flex;
   flex-direction: column;
@@ -682,11 +682,11 @@ code {
 .picker-item {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 32px;
   width: 100%;
-  padding: 11px 12px;
+  padding: 24px 27px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 22px;
   background: transparent;
   color: #fff;
   text-align: left;
@@ -700,7 +700,7 @@ code {
 .picker-item-main { flex: 1 1 auto; min-width: 0; }
 .picker-item-main b {
   display: block;
-  font-size: 13px;
+  font-size: 30px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -708,8 +708,8 @@ code {
 }
 .picker-item-main small {
   display: block;
-  margin-top: 2px;
-  font-size: 10px;
+  margin-top: 6px;
+  font-size: 23px;
   color: rgba(255, 255, 255, 0.32);
   white-space: nowrap;
   overflow: hidden;
@@ -717,6 +717,71 @@ code {
 }
 .picker-item-state {
   flex: none;
-  font-size: 10px;
+  font-size: 23px;
   color: rgba(255, 255, 255, 0.4);
 }
+
+/* Apps menu editor */
+.app-list { display: flex; flex-direction: column; gap: 9px; }
+.app-row {
+  display: grid;
+  grid-template-columns: 30px minmax(120px, 1fr) minmax(150px, 1.2fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.app-row .app-order {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.34);
+  font-variant-numeric: tabular-nums;
+}
+.app-row input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background: rgba(4, 6, 12, 0.4);
+  color: #fff;
+  font-size: 13px;
+}
+.app-row input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+@media (max-width: 720px) {
+  .app-row { grid-template-columns: 24px 1fr; }
+  .app-row input[data-app-field="id"] { grid-column: 2; }
+  .app-row .btn { grid-row: auto; }
+}
+
+/* Per-field reset control */
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.field-head > span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.field-reset {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(122, 162, 255, 0.68);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.field-reset:hover { color: #9db8ff; }
+.field-reset-wrap { display: flex; align-items: center; gap: 10px; flex: none; }

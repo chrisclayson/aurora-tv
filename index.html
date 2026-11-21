@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=1920, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src *; connect-src * ws: wss: http: https:; frame-src 'self' http: https:; font-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob: http: https:; media-src *; connect-src * ws: wss: http: https:; frame-src 'self' http: https:; font-src 'self' data:">
   <title>Aurora</title>
   <link rel="stylesheet" href="css/app.css?v=20261117">
 </head>
@@ -13,11 +13,28 @@
     <span class="grain"></span>
   </div>
 
+  <div id="festive-layer" aria-hidden="true" hidden>
+    <div class="fairy-lights" id="fairy-lights"></div>
+    <div class="festive-snow" id="festive-snow"></div>
+  </div>
+
   <section id="screen-home" class="screen home active" aria-label="Aurora home">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark">A</span>
+        <span class="brand-mark">
+          <span class="brand-letter">A</span>
+          <span class="santa-hat" id="santa-hat" aria-hidden="true">
+            <svg viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 41C12 25 26 11 47 8c8-1 13 3 15 9-8 1-15 7-20 15-4 7-6 14-6 20Z" fill="#d6203a"/>
+              <path d="M16 40c8-4 20-4 29 0" stroke="#ff8a96" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+              <path d="M5 41c0-5 4-9 10-9h30c7 0 12 4 12 9 0 6-5 10-12 10H17C10 51 5 47 5 41Z" fill="#fff"/>
+              <circle cx="58" cy="16" r="8" fill="#fff"/>
+              <circle cx="55" cy="13" r="2.4" fill="#fff"/>
+            </svg>
+          </span>
+        </span>
         <span class="brand-name">AURORA</span>
+        <span class="festive-countdown" id="christmas-countdown" hidden></span>
       </div>
       <div class="topbar-right">
         <div class="statuses">
@@ -25,12 +42,11 @@
             <span class="status-dot"></span><span class="status-label">HA</span>
           </span>
         </div>
-        <button class="icon-btn" id="btn-settings" aria-label="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="3.1"></circle>
-            <path d="M19.4 14.2a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06A2 2 0 1 1 3.14 15.9l.06-.06a1.7 1.7 0 0 0 .34-1.87A1.7 1.7 0 0 0 2 12.94H2a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 1 1 6.1 3.14l.06.06a1.7 1.7 0 0 0 1.87.34H8.1A1.7 1.7 0 0 0 9.13 2V2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06A2 2 0 1 1 18.9 6.1l-.06.06a1.7 1.7 0 0 0-.34 1.87v.04A1.7 1.7 0 0 0 20 9.13h.04a2 2 0 1 1 0 4H20a1.7 1.7 0 0 0-1.56 1.07Z"></path>
-          </svg>
+        <button type="button" class="home-notify" id="home-notify" aria-label="Home Assistant notifications" hidden>
+          <span class="home-notify-icon" id="home-notify-icon"></span>
+          <span class="home-notify-badge" id="home-notify-badge">0</span>
         </button>
+        <div class="home-weather" id="home-weather" aria-label="Weather forecast" hidden></div>
         <div class="clock">
           <span id="clock-time">20:41</span>
           <span id="clock-date">Saturday, 14 November</span>
@@ -45,9 +61,17 @@
           <h1 id="home-title">Good evening.</h1>
           <p class="hero-sub" id="home-sub">Living Room</p>
         </div>
+        <aside class="home-calendar" id="home-calendar" aria-label="Upcoming events" hidden></aside>
       </div>
-      <div class="rail-wrap">
-        <div class="rail" id="tile-rail" role="list"></div>
+      <div class="rail-wrap" id="rail-wrap">
+        <div class="rail rail-main" id="tile-rail" role="list"></div>
+        <div class="apps-row" id="apps-row" hidden>
+          <div class="apps-row-head">
+            <span class="apps-row-title">Apps</span>
+            <span class="apps-row-hint"><span class="keycap ok">OK</span> Open <span class="keycap">↩</span> Close</span>
+          </div>
+          <div class="rail apps-rail" id="app-rail" role="list"></div>
+        </div>
       </div>
     </main>
 
@@ -56,7 +80,6 @@
       <div class="hints">
         <span class="hint"><span class="keycap">←</span><span class="keycap">→</span> Navigate</span>
         <span class="hint"><span class="keycap ok">OK</span> Select</span>
-        <span class="hint"><span class="keycap">⚙</span> Settings</span>
         <span class="hint"><span class="keycap">↩</span> Exit</span>
       </div>
     </div>
@@ -131,7 +154,29 @@
     <footer class="ha-footer">
       <span><span class="keycap">↑</span><span class="keycap">↓</span><span class="keycap">←</span><span class="keycap">→</span> Navigate</span>
       <span><span class="keycap ok">OK</span> Toggle</span>
+      <span><span class="keycap ok">Hold OK</span> Controls</span>
       <span><span class="keycap">CH</span> Page</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-ha-detail" class="screen ha-detail" aria-label="Entity controls">
+    <header class="sub-head ha-head">
+      <div>
+        <p class="eyebrow" id="ha-detail-eyebrow">HOME ASSISTANT</p>
+        <h1 id="ha-detail-title">Entity</h1>
+      </div>
+      <div class="ha-conn" id="ha-detail-conn">
+        <span class="status-dot"></span><span id="ha-detail-conn-label">Connecting</span>
+      </div>
+    </header>
+
+    <div class="ha-detail-body" id="ha-detail-body"></div>
+
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap">←</span><span class="keycap">→</span> Adjust</span>
+      <span><span class="keycap ok">OK</span> Change</span>
       <span><span class="keycap">↩</span> Back</span>
     </footer>
   </section>
@@ -313,7 +358,8 @@
     <footer class="settings-footer">
       <span><span class="keycap">↑</span><span class="keycap">↓</span> Navigate</span>
       <span><span class="keycap ok">OK</span> Edit</span>
-      <span><span class="keycap">↩</span> Discard &amp; close</span>
+      <span><span class="keycap blue">●</span> Reset item</span>
+      <span><span class="keycap">↩</span> Back</span>
     </footer>
   </section>
 
@@ -354,6 +400,49 @@
     <footer class="ha-footer">
       <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
       <span><span class="keycap ok">OK</span> Select</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-notifications" class="screen notifications" aria-label="Home Assistant notifications">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">HOME ASSISTANT</p>
+        <h1>Notifications</h1>
+      </div>
+      <div class="ha-browser-status" id="notifications-status"></div>
+    </header>
+    <div class="notifications-wrap">
+      <div class="notifications-list" id="notifications-list"></div>
+    </div>
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap ok">OK</span> Dismiss</span>
+      <span><span class="keycap blue">●</span> Dismiss all</span>
+      <span><span class="keycap">↩</span> Back</span>
+    </footer>
+  </section>
+
+  <section id="screen-app-picker" class="screen app-picker" aria-label="Choose apps for the home menu">
+    <header class="sub-head">
+      <div>
+        <p class="eyebrow">SETTINGS</p>
+        <h1 id="app-picker-title">Apps menu</h1>
+      </div>
+      <div class="ha-browser-status" id="app-picker-status"></div>
+    </header>
+    <div class="entity-picker-wrap">
+      <div class="entity-picker-list" id="app-picker-list"></div>
+      <div class="ha-empty" id="app-picker-empty" hidden>
+        <span class="ha-empty-title">No installed apps found</span>
+        <span class="ha-empty-sub">Use “Add app ID manually” to add an app by its Tizen application ID.</span>
+      </div>
+    </div>
+    <footer class="ha-footer">
+      <span><span class="keycap">↑</span><span class="keycap">↓</span> Move</span>
+      <span><span class="keycap ok">OK</span> Select</span>
+      <span><span class="keycap red">●</span> Search</span>
+      <span id="app-picker-reorder"><span class="keycap">←</span><span class="keycap">→</span> Reorder</span>
       <span><span class="keycap">↩</span> Back</span>
     </footer>
   </section>

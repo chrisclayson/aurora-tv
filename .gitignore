@@ -14,3 +14,5 @@ config-server/node_modules/
 PRIVATE-NOTES.md
 config-server/data/*.json
 !config-server/data/example.json
+
+config-server/data/epg-cache.xml

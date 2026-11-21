@@ -2,7 +2,7 @@ ARG BUILD_FROM=node:20-alpine
 FROM ${BUILD_FROM}
 
 WORKDIR /app
-COPY package.json server.js ./
+COPY package.json server.js epg.js ./
 COPY public ./public
 COPY data ./seed
 COPY run.sh /run.sh
