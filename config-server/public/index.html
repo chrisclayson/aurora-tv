@@ -30,6 +30,7 @@
       <div class="side-head">
         <span>Devices</span>
         <span class="side-head-actions">
+          <button class="icon-btn" id="push-device" type="button" title="Push this configuration to a TV" aria-label="Push this configuration to a TV">↑</button>
           <button class="icon-btn" id="import-device" type="button" title="Import a TV by IP" aria-label="Import a TV by IP">↓</button>
           <button class="icon-btn" id="add-device" type="button" title="Add device" aria-label="Add device">+</button>
         </span>
@@ -50,6 +51,7 @@
         </div>
         <div class="head-actions">
           <button id="delete-device" class="btn ghost danger small" type="button">Delete</button>
+          <button id="push-device-head" class="btn ghost small" type="button">Push to TV</button>
           <button id="download-config" class="btn ghost small" type="button">Download config.json</button>
           <button id="revert" class="btn ghost small" type="button">Revert</button>
           <button id="save" class="btn primary" type="button">Save changes</button>
@@ -121,6 +123,39 @@
       <div class="modal-actions">
         <button class="btn ghost" id="import-cancel" type="button">Cancel</button>
         <button class="btn primary" id="import-save" type="button">Import TV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="push-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="push-title">
+      <h2 id="push-title">Push configuration to TV</h2>
+      <p class="modal-copy">
+        This sends <b id="push-device-name">this profile</b> to a TV running Aurora.
+        On the TV open <b>Settings → On-TV web configuration</b> and read the
+        six-character import code. The code only works while Settings is open.
+        The TV applies the pushed profile when Settings closes.
+      </p>
+      <label class="field">
+        <span>TV IP address</span>
+        <input id="push-ip" type="text" placeholder="192.168.50.143" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Import code</span>
+        <div class="mfa-input" id="push-code-inputs">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="one-time-code" spellcheck="false" aria-label="Push code character 1">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Push code character 2">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Push code character 3">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Push code character 4">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Push code character 5">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Push code character 6">
+        </div>
+        <small>Save changes first if you want to push your latest edits. An existing profile on the TV is replaced. The TV's local-server and remote-sync settings are left unchanged.</small>
+      </label>
+      <p class="form-error" id="push-error" hidden></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="push-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="push-save" type="button">Push to TV</button>
       </div>
     </div>
   </div>

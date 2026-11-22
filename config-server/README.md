@@ -102,6 +102,23 @@ VLAN/routing rules and firewall. The on-TV server itself has no subnet
 restriction and listens on all interfaces. A stale connection can no longer
 wedge it: the server drops idle sockets after 750 ms.
 
+## Push a saved profile to a TV
+
+1. Select the device, make your edits and press **Save changes**.
+2. Press **Push to TV** (the ↑ button, or the button above the editor).
+3. On the TV open **Settings → On-TV web configuration** and read the
+   six-character **Import code**.
+4. Enter the TV's IP address and code in the add-on and press **Push to TV**.
+
+This uses the same protections as an import: the public health check, a fresh
+`Connection: close` socket, and the six-character code in the
+`X-Aurora-Token` header. The code only works while Settings is open. The TV
+applies the pushed profile when Settings closes.
+
+`remoteConfig` and `localServer` are removed from the pushed profile. The TV
+keeps its own remote-sync URL/token and local web-server settings, so pushing
+an old profile cannot stop it polling this add-on or change its access token.
+
 ## TVs
 
 Point each TV's Home Assistant URL at `http://homeassistant.local:8123`, and its

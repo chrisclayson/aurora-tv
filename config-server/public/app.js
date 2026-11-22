@@ -64,6 +64,11 @@
   var importCodeInputs = Array.prototype.slice.call(
     document.querySelectorAll('#import-code-inputs input')
   );
+  var pushModal = document.getElementById('push-modal');
+  var pushError = document.getElementById('push-error');
+  var pushCodeInputs = Array.prototype.slice.call(
+    document.querySelectorAll('#push-code-inputs input')
+  );
 
   /* ---------- utilities ---------- */
 
@@ -395,6 +400,8 @@
 
   function render() {
     if (!state.config) return;
+    var pushHead = document.getElementById('push-device-head');
+    if (pushHead) pushHead.disabled = false;
     var config = state.config;
     title.textContent = config.deviceName || state.current || 'Device';
     meta.textContent = [config.model || 'Unknown model', 'ID ' + state.current,
@@ -855,22 +862,56 @@
     setTimeout(function () { document.getElementById('new-id').focus(); }, 50);
   }
 
-  function setImportCode(value) {
+  function setCode(inputs, value) {
     var chars = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6).split('');
-    importCodeInputs.forEach(function (input, index) {
+    inputs.forEach(function (input, index) {
       input.value = chars[index] || '';
     });
   }
 
-  function importCode() {
-    return importCodeInputs.map(function (input) { return input.value; }).join('').toUpperCase();
+  function codeValue(inputs) {
+    return inputs.map(function (input) { return input.value; }).join('').toUpperCase();
+  }
+
+  function bindCodeInputs(inputs, submit) {
+    inputs.forEach(function (input, index) {
+      input.addEventListener('input', function () {
+        input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 1);
+        if (input.value && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
+      });
+      input.addEventListener('keydown', function (event) {
+        if (event.key === 'Backspace' && !input.value && index > 0) {
+          event.preventDefault();
+          inputs[index - 1].focus();
+          inputs[index - 1].value = '';
+        } else if (event.key === 'ArrowLeft' && index > 0) {
+          event.preventDefault();
+          inputs[index - 1].focus();
+        } else if (event.key === 'ArrowRight' && index < inputs.length - 1) {
+          event.preventDefault();
+          inputs[index + 1].focus();
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          submit();
+        }
+      });
+      input.addEventListener('paste', function (event) {
+        event.preventDefault();
+        var paste = (event.clipboardData || window.clipboardData).getData('text');
+        setCode(inputs, paste);
+        var next = inputs.findIndex(function (node) { return !node.value; });
+        if (next >= 0) inputs[next].focus();
+      });
+    });
   }
 
   function openImportDevice() {
     importError.hidden = true;
     importError.textContent = '';
     document.getElementById('import-ip').value = '';
-    setImportCode('');
+    setCode(importCodeInputs, '');
     importModal.hidden = false;
     setTimeout(function () { document.getElementById('import-ip').focus(); }, 50);
   }
@@ -884,7 +925,7 @@
     var input = document.getElementById('import-ip');
     var button = document.getElementById('import-save');
     var ip = input.value.trim();
-    var code = importCode();
+    var code = codeValue(importCodeInputs);
     importError.hidden = true;
     if (!ip) {
       importError.hidden = false;
@@ -903,6 +944,7 @@
         method: 'POST',
         body: JSON.stringify({ ip: ip, code: code })
       });
+      try { localStorage.setItem('aurora-last-tv-ip', ip); } catch (e) { /* ignore */ }
       importModal.hidden = true;
       await loadDevices();
       await loadConfig(data.device.id);
@@ -915,6 +957,77 @@
     } finally {
       button.disabled = false;
       button.textContent = 'Import TV';
+    }
+  }
+
+  function openPushDevice() {
+    if (!state.current || !state.config) {
+      toast('Select a device first', 'error');
+      return;
+    }
+    if (state.dirty) {
+      toast('Save your changes before pushing', 'error');
+      return;
+    }
+    document.getElementById('push-device-name').textContent = state.config.deviceName || state.current;
+    var lastIp = '';
+    try { lastIp = localStorage.getItem('aurora-last-tv-ip') || ''; } catch (e) { /* ignore */ }
+    document.getElementById('push-ip').value = lastIp;
+    setCode(pushCodeInputs, '');
+    pushError.hidden = true;
+    pushError.textContent = '';
+    pushModal.hidden = false;
+    setTimeout(function () {
+      var ipInput = document.getElementById('push-ip');
+      if (lastIp) pushCodeInputs[0].focus();
+      else { ipInput.focus(); ipInput.select(); }
+    }, 50);
+  }
+
+  function closePushDevice() {
+    pushModal.hidden = true;
+    pushError.hidden = true;
+  }
+
+  async function pushConfig() {
+    var input = document.getElementById('push-ip');
+    var button = document.getElementById('push-save');
+    var ip = input.value.trim();
+    var code = codeValue(pushCodeInputs);
+    pushError.hidden = true;
+    if (!state.current || !state.config) {
+      pushError.hidden = false;
+      pushError.textContent = 'Select a device configuration first';
+      return;
+    }
+    if (!ip) {
+      pushError.hidden = false;
+      pushError.textContent = 'Enter the TV IP address';
+      return;
+    }
+    if (code.length !== 6) {
+      pushError.hidden = false;
+      pushError.textContent = 'Enter the 6-character import code from the TV';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Pushing…';
+    try {
+      var data = await api('api/push/tv', {
+        method: 'POST',
+        body: JSON.stringify({ ip: ip, code: code, deviceId: state.current })
+      });
+      try { localStorage.setItem('aurora-last-tv-ip', ip); } catch (e) { /* ignore */ }
+      pushModal.hidden = true;
+      toast('Pushed ' + ((data.device && data.device.name) || state.current) + ' to ' + ip + '. Close Settings on the TV to apply it.', 'ok', 5200);
+    } catch (err) {
+      if (!err.unauthorised) {
+        pushError.hidden = false;
+        pushError.textContent = err.message;
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Push to TV';
     }
   }
 
@@ -960,6 +1073,8 @@
     emptyEl.hidden = false;
     title.textContent = 'No device selected';
     meta.textContent = 'Add a device to get started.';
+    var pushHead = document.getElementById('push-device-head');
+    if (pushHead) pushHead.disabled = true;
     clearDirty();
     renderDevices();
   }
@@ -1079,37 +1194,18 @@
         if (importCodeInputs[0]) importCodeInputs[0].focus();
       }
     });
-    importCodeInputs.forEach(function (input, index) {
-      input.addEventListener('input', function () {
-        input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 1);
-        if (input.value && index < importCodeInputs.length - 1) {
-          importCodeInputs[index + 1].focus();
-        }
-      });
-      input.addEventListener('keydown', function (event) {
-        if (event.key === 'Backspace' && !input.value && index > 0) {
-          event.preventDefault();
-          importCodeInputs[index - 1].focus();
-          importCodeInputs[index - 1].value = '';
-        } else if (event.key === 'ArrowLeft' && index > 0) {
-          event.preventDefault();
-          importCodeInputs[index - 1].focus();
-        } else if (event.key === 'ArrowRight' && index < importCodeInputs.length - 1) {
-          event.preventDefault();
-          importCodeInputs[index + 1].focus();
-        } else if (event.key === 'Enter') {
-          event.preventDefault();
-          importDevice();
-        }
-      });
-      input.addEventListener('paste', function (event) {
+    bindCodeInputs(importCodeInputs, importDevice);
+    document.getElementById('push-device').addEventListener('click', openPushDevice);
+    document.getElementById('push-device-head').addEventListener('click', openPushDevice);
+    document.getElementById('push-cancel').addEventListener('click', closePushDevice);
+    document.getElementById('push-save').addEventListener('click', pushConfig);
+    document.getElementById('push-ip').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
         event.preventDefault();
-        var paste = (event.clipboardData || window.clipboardData).getData('text');
-        setImportCode(paste);
-        var next = importCodeInputs.findIndex(function (node) { return !node.value; });
-        if (next >= 0) importCodeInputs[next].focus();
-      });
+        if (pushCodeInputs[0]) pushCodeInputs[0].focus();
+      }
     });
+    bindCodeInputs(pushCodeInputs, pushConfig);
     document.getElementById('token-btn').addEventListener('click', function () { openTokenModal(''); });
 
     deviceList.addEventListener('click', function (event) {

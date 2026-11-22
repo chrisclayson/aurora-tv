@@ -548,6 +548,20 @@ after a short wait, and the add-on opens a fresh `Connection: close` socket for
 each TV request, so a browser preconnect or a half-open import can no longer
 make port 8099 stop responding.
 
+To force a saved profile onto a TV:
+
+1. Select the device in the add-on, make your edits and press **Save changes**.
+2. Press **Push to TV**.
+3. On the TV open **Settings → On-TV web configuration** and read the
+   six-character **Import code**.
+4. Enter the TV's IP address and the code in the add-on. The code is sent in
+   the `X-Aurora-Token` header, exactly like an import.
+
+The TV queues the pushed profile while Settings is open and applies it when
+Settings closes. The TV's own local-server and remote-sync settings are left
+unchanged, so a stale profile cannot lock the TV out of future updates. The
+code is only valid while Settings is open and is regenerated each time.
+
 Live profiles and local deployment notes are git-ignored, so Home Assistant
 tokens never enter the repository. Point
 each TV's remote configuration at the add-on:

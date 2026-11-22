@@ -247,15 +247,18 @@ function normalizeTvHost(value) {
    never sends another request would block every later health check. */
 function tvJson(url, options) {
   options = options || {};
+  const body = options.body == null ? null : Buffer.from(String(options.body));
   return new Promise(function (resolve, reject) {
+    const headers = Object.assign({
+      Accept: 'application/json',
+      Connection: 'close'
+    }, options.headers || {});
+    if (body) headers['Content-Length'] = body.length;
     const request = http.request(url, {
       method: options.method || 'GET',
       agent: false,
       timeout: options.timeout || 8000,
-      headers: Object.assign({
-        Accept: 'application/json',
-        Connection: 'close'
-      }, options.headers || {})
+      headers: headers
     }, function (res) {
       const chunks = [];
       res.on('data', function (chunk) { chunks.push(chunk); });
@@ -265,8 +268,20 @@ function tvJson(url, options) {
     });
     request.on('timeout', function () { request.destroy(new Error('timeout')); });
     request.on('error', reject);
+    if (body) request.write(body);
     request.end();
   });
+}
+
+/* The health endpoint is public. Checking it first distinguishes a routing or
+   firewall problem from import mode not being open on the TV. */
+async function checkTvHealth(base, host) {
+  try {
+    const health = await tvJson(base + '/api/health', { timeout: 6000 });
+    if (health.status !== 200) throw new Error('HTTP ' + health.status);
+  } catch (err) {
+    throw new Error('Cannot reach the TV at ' + host + ':8099. Check that the TV and Home Assistant can route to each other (including across VLANs/subnets) and that port 8099 is not blocked.');
+  }
 }
 
 async function importTv(body) {
@@ -277,14 +292,7 @@ async function importTv(body) {
   }
   const base = 'http://' + host + ':8099';
 
-  // The health endpoint is public. Checking it first distinguishes a routing
-  // or firewall problem from import mode not being enabled on the TV.
-  try {
-    const health = await tvJson(base + '/api/health', { timeout: 6000 });
-    if (health.status !== 200) throw new Error('HTTP ' + health.status);
-  } catch (err) {
-    throw new Error('Cannot reach the TV at ' + host + ':8099. Check that the TV and Home Assistant can route to each other (including across VLANs/subnets) and that port 8099 is not blocked.');
-  }
+  await checkTvHealth(base, host);
 
   let payload;
   try {
@@ -322,6 +330,56 @@ async function importTv(body) {
   writeConfig(id, config);
   log('imported device', id, 'from', host, existed ? '(replaced)' : '');
   return { ok: true, device: deviceSummary(id), config: config, replaced: existed, host: host };
+}
+
+/* Push a saved profile from this server to a TV. The TV only accepts it while
+   Settings is open, when the local server's token is the displayed code. */
+async function pushTv(body) {
+  const deviceId = String((body && body.deviceId) || '').trim().toLowerCase();
+  if (!DEVICE_ID.test(deviceId) || !fs.existsSync(configFile(deviceId))) {
+    throw new Error('Choose a saved device configuration to push');
+  }
+  const host = normalizeTvHost(body && body.ip);
+  const code = String((body && body.code) || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    throw new Error('Enter the 6-character import code shown on the TV');
+  }
+  const base = 'http://' + host + ':8099';
+  await checkTvHealth(base, host);
+
+  const loaded = readConfig(deviceId);
+  /* Never push the transport that delivers remote updates: a stale or empty
+     remoteConfig would stop the TV polling this server. The TV also protects
+     these fields locally, but strip them here as a second guard. */
+  const pushed = JSON.parse(JSON.stringify(loaded.config));
+  delete pushed.remoteConfig;
+  delete pushed.localServer;
+  const payload = JSON.stringify({ config: pushed });
+  let res;
+  try {
+    res = await tvJson(base + '/api/config/local', {
+      method: 'PUT',
+      timeout: 20000,
+      headers: {
+        'X-Aurora-Token': code,
+        'Content-Type': 'application/json'
+      },
+      body: payload
+    });
+  } catch (err) {
+    if (err && err.message === 'timeout') {
+      throw new Error('The TV answered health checks but timed out writing the profile; wait a moment and try again.');
+    }
+    throw err;
+  }
+  if (res.status === 401) {
+    throw new Error('The import code is wrong or Settings has closed on the TV');
+  }
+  if (res.status !== 200) {
+    throw new Error('The TV returned HTTP ' + res.status);
+  }
+  log('pushed device', deviceId, 'to', host);
+  return { ok: true, device: deviceSummary(deviceId), host: host };
 }
 
 async function testXmltv(body) {
@@ -463,6 +521,15 @@ const server = http.createServer(async function (req, res) {
         return json(res, 200, await importTv(body));
       } catch (err) {
         return json(res, 400, { error: err.name === 'AbortError' ? 'Timed out contacting the TV' : err.message });
+      }
+    }
+
+    if (url.pathname === '/api/push/tv' && req.method === 'POST') {
+      const body = parseJson(await readBody(req)) || {};
+      try {
+        return json(res, 200, await pushTv(body));
+      } catch (err) {
+        return json(res, 400, { error: err.message });
       }
     }
 

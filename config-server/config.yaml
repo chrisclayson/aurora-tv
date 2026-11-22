@@ -1,5 +1,5 @@
 name: Aurora TV Configuration
-version: "1.4.1"
+version: "1.4.2"
 slug: aurora_config
 description: Central Aurora TV configuration and UK Freeview XMLTV guide
 url: https://github.com/chrisclayson/aurora-tv
