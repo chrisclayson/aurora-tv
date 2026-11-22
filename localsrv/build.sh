@@ -29,4 +29,6 @@ arch -x86_64 /usr/bin/python3 "$EMCC" \
   --shell-file shell.html \
   server.c
 
+arch -x86_64 /usr/bin/python3 "$ROOT/tools/patch-localsrv.py"
+
 echo "Rebuilt localsrv/server.{html,js,wasm,data}"

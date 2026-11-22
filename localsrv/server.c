@@ -15,6 +15,7 @@ static int config_len = 0;
 static char auth_token[160];
 static char local_ip[64];
 static int config_rev = 0;
+static int stop_requested = 0;
 static char request[REQ_MAX];
 
 static int find_header(const char *req, const char *name, char *out, int max);
@@ -108,7 +109,7 @@ static void respond(int fd, int code, const char *type, const char *body, int le
     "HTTP/1.0 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
     "Cache-Control: no-store\r\nConnection: close\r\n"
     "Access-Control-Allow-Origin: *\r\n"
-    "Access-Control-Allow-Headers: Authorization, Content-Type, X-Aurora-Token\r\n"
+    "Access-Control-Allow-Headers: Authorization, Content-Type, X-Aurora-Token, X-Aurora-New-Token\r\n"
     "Access-Control-Allow-Methods: GET, PUT, POST, OPTIONS\r\n"
     "%s"
     "\r\n",
@@ -177,6 +178,18 @@ static int authorized(const char *req) {
     return !strcmp(value, auth_token);
   }
   return auth_token[0] == 0;
+}
+
+static int valid_token(const char *value) {
+  if (!value) return 0;
+  int len = (int)strlen(value);
+  if (len < 1 || len > 64) return 0;
+  for (int i = 0; i < len; i++) {
+    char c = value[i];
+    if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+          (c >= '0' && c <= '9') || c == '-' || c == '_')) return 0;
+  }
+  return 1;
 }
 
 static void url_path(const char *request_line, char *out, int max) {
@@ -401,6 +414,34 @@ static int handle_client(int client) {
     return 0;
   }
 
+  /* The TV rotates the local-server token when Settings opens (to a random
+     six-character import code) and closes. This keeps the port up instead of
+     restarting the WebAssembly worker, which would leak its listening socket. */
+  if (!strcmp(path, "/api/auth/shutdown")) {
+    if (strcmp(method, "POST") && strcmp(method, "PUT")) {
+      respond_cstr(client, 400, "application/json", "{\"error\":\"Use POST\"}");
+      return 0;
+    }
+    stop_requested = 1;
+    respond_cstr(client, 200, "application/json; charset=utf-8", "{\"ok\":true}");
+    return 0;
+  }
+
+  if (!strcmp(path, "/api/auth/local")) {
+    if (strcmp(method, "POST") && strcmp(method, "PUT")) {
+      respond_cstr(client, 400, "application/json", "{\"error\":\"Use POST\"}");
+      return 0;
+    }
+    char next[160];
+    if (!find_header(request, "x-aurora-new-token", next, sizeof(next)) || !valid_token(next)) {
+      respond_cstr(client, 400, "application/json", "{\"error\":\"Invalid token\"}");
+      return 0;
+    }
+    snprintf(auth_token, sizeof(auth_token), "%s", next);
+    respond_cstr(client, 200, "application/json; charset=utf-8", "{\"ok\":true}");
+    return 0;
+  }
+
   if (!strcmp(path, "/api/devices")) {
     if (!strcmp(method, "GET")) send_devices(client);
     else respond_cstr(client, 400, "application/json", "{\"error\":\"The on-TV server supports one TV\"}");
@@ -478,6 +519,8 @@ int main(void) {
     if (client < 0) continue;
     handle_client(client);
     close(client);
+    if (stop_requested) break;
   }
+  close(server);
   return 0;
 }

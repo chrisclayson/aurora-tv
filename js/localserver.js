@@ -18,6 +18,8 @@
     pollTimer: null,
     pendingPush: null,
     inFlight: false,
+    tokenUpdate: null,
+    stopping: false,
     onConfig: null,
     onStatus: null
   };
@@ -49,7 +51,10 @@
         reject(new Error('Local config server timed out'));
       }, timeoutMs || 4000);
       var headers = Object.assign({}, (options && options.headers) || {});
-      if (state.token) headers['X-Aurora-Token'] = state.token;
+      var token = Object.prototype.hasOwnProperty.call(options || {}, 'token')
+        ? options.token
+        : state.token;
+      if (token) headers['X-Aurora-Token'] = token;
       fetch(BASE + path, Object.assign({}, options || {}, { headers: headers })).then(function (res) {
         if (done) return;
         if (!res.ok) {
@@ -199,29 +204,61 @@
     }
   }
 
+  function setToken(token, callback) {
+    token = token || '';
+    if (token === state.token) {
+      if (typeof callback === 'function') callback();
+      return;
+    }
+    if (!state.enabled || !state.ready) {
+      state.token = token;
+      if (typeof callback === 'function') callback();
+      return;
+    }
+    var previous = state.token;
+    state.token = token;
+    state.tokenUpdate = fetchJson('/api/auth/local', {
+      method: 'POST',
+      headers: { 'X-Aurora-New-Token': token },
+      token: previous,
+      cache: 'no-store'
+    }, 4000).then(function () {
+      state.error = '';
+      state.tokenUpdate = null;
+      if (typeof callback === 'function') callback();
+      emitStatus();
+    }).catch(function (err) {
+      state.token = previous;
+      state.error = err.message || 'token update failed';
+      state.tokenUpdate = null;
+      emitStatus();
+    });
+  }
+
   function configure(enabled, handlers, token) {
     if (handlers && typeof handlers.onConfig === 'function') state.onConfig = handlers.onConfig;
     if (handlers && typeof handlers.onStatus === 'function') state.onStatus = handlers.onStatus;
     token = token || '';
-    if (token !== state.token) {
-      state.token = token;
-      if (state.enabled) stop();
-    }
-
     if (!enabled) {
-      stop();
+      if (state.enabled) stop();
+      state.token = token;
       return;
     }
-    if (state.enabled && (state.ready || state.starting)) return;
+    if (state.enabled && (state.ready || state.starting)) {
+      if (token !== state.token) setToken(token);
+      return;
+    }
+    state.token = token;
     state.enabled = true;
     ensureFrame();
     startHealthCheck();
   }
 
-  function stop() {
+  function teardown() {
     state.enabled = false;
     state.ready = false;
     state.starting = false;
+    state.stopping = false;
     state.lastRevision = '';
     state.localIp = '';
     state.error = '';
@@ -233,8 +270,33 @@
     emitStatus();
   }
 
+  /* Ask the worker to close its listening socket before removing the iframe.
+     Tizen keeps that native socket bound after the worker dies, so a plain
+     iframe removal would leave port 8099 unable to bind again. */
+  function stop() {
+    if (state.stopping) return;
+    if (!state.enabled) {
+      teardown();
+      return;
+    }
+    state.stopping = true;
+    var pending = state.tokenUpdate || Promise.resolve();
+    pending.then(function () {
+      return fetchJson('/api/auth/shutdown', {
+        method: 'POST',
+        token: state.token,
+        cache: 'no-store'
+      }, 1500);
+    }).then(function () {
+      setTimeout(teardown, 250);
+    }).catch(function () {
+      teardown();
+    });
+  }
+
   A.LocalServer = {
     configure: configure,
+    setToken: setToken,
     stop: stop,
     push: push,
     status: status,

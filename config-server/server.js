@@ -242,6 +242,33 @@ function normalizeTvHost(value) {
   return text;
 }
 
+/* TV requests deliberately bypass the global fetch/undici pool. The on-TV
+   WebAssembly server is single-threaded, so a pooled keep-alive socket that
+   never sends another request would block every later health check. */
+function tvJson(url, options) {
+  options = options || {};
+  return new Promise(function (resolve, reject) {
+    const request = http.request(url, {
+      method: options.method || 'GET',
+      agent: false,
+      timeout: options.timeout || 8000,
+      headers: Object.assign({
+        Accept: 'application/json',
+        Connection: 'close'
+      }, options.headers || {})
+    }, function (res) {
+      const chunks = [];
+      res.on('data', function (chunk) { chunks.push(chunk); });
+      res.on('end', function () {
+        resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') });
+      });
+    });
+    request.on('timeout', function () { request.destroy(new Error('timeout')); });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 async function importTv(body) {
   const host = normalizeTvHost(body && body.ip);
   const code = String((body && body.code) || '').trim().toUpperCase();
@@ -252,45 +279,31 @@ async function importTv(body) {
 
   // The health endpoint is public. Checking it first distinguishes a routing
   // or firewall problem from import mode not being enabled on the TV.
-  const healthController = new AbortController();
-  const healthTimer = setTimeout(function () { healthController.abort(); }, 6000);
   try {
-    const health = await fetch(base + '/api/health', {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-      signal: healthController.signal
-    });
-    if (!health.ok) throw new Error('HTTP ' + health.status);
+    const health = await tvJson(base + '/api/health', { timeout: 6000 });
+    if (health.status !== 200) throw new Error('HTTP ' + health.status);
   } catch (err) {
     throw new Error('Cannot reach the TV at ' + host + ':8099. Check that the TV and Home Assistant can route to each other (including across VLANs/subnets) and that port 8099 is not blocked.');
-  } finally {
-    clearTimeout(healthTimer);
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(function () { controller.abort(); }, 20000);
   let payload;
   try {
-    const res = await fetch(base + '/api/config/local', {
-      headers: {
-        Accept: 'application/json',
-        'X-Aurora-Token': code
-      },
-      cache: 'no-store',
-      signal: controller.signal
+    const res = await tvJson(base + '/api/config/local', {
+      timeout: 20000,
+      headers: { 'X-Aurora-Token': code }
     });
-    if (!res.ok) {
-      if (res.status === 401) {
-        throw new Error('The import code is wrong or Settings has closed on the TV');
-      }
+    if (res.status === 401) {
+      throw new Error('The import code is wrong or Settings has closed on the TV');
+    }
+    if (res.status !== 200) {
       throw new Error('The TV returned HTTP ' + res.status);
     }
-    payload = await res.json();
+    payload = JSON.parse(res.body);
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('The TV answered health checks but timed out reading its profile; wait a moment and try again.');
+    if (err && err.message === 'timeout') {
+      throw new Error('The TV answered health checks but timed out reading its profile; wait a moment and try again.');
+    }
     throw err;
-  } finally {
-    clearTimeout(timer);
   }
   const config = payload && payload.config ? payload.config : payload;
   if (!config || typeof config !== 'object' || Array.isArray(config)) {

@@ -34,6 +34,7 @@ python3 "$ROOT/tools/make-seed.py" "$STAGE/js/seed.js" >/dev/null
 # Only the browser UI changes regularly; repack it into the preloaded payload
 # instead of requiring the Samsung Emscripten SDK for every build.
 python3 "$ROOT/tools/pack-localui.py" >/dev/null
+python3 "$ROOT/tools/patch-localsrv.py" >/dev/null
 mkdir -p "$STAGE/localsrv"
 cp "$ROOT/localsrv/server.html" "$STAGE/localsrv/"
 cp "$ROOT/localsrv/server.js" "$STAGE/localsrv/"

@@ -42,6 +42,7 @@
     liveToken: 0,
     sourceRenderTimer: null,
     localServerStatus: { enabled: false, ready: false, error: '', url: '', revision: '' },
+    localServerToken: '',
     setupOverlayScheduled: false,
     setupAttempts: 0,
     remote: {
@@ -60,7 +61,9 @@
       rows: [],
       actions: [],
       dirty: false,
-      importCode: ''
+      importCode: '',
+      importReady: false,
+      importRetry: 0
     },
     savedLabel: '',
     festiveKey: '',
@@ -2757,9 +2760,12 @@
     row('localServer.enabled', 'TV web server', 'Port 8099 · ' +
       (localStatus.ready ? 'running' : (localStatus.enabled ? (localStatus.error || 'starting') : 'stopped')),
       'toggle', !!draft.localServer.enabled);
+    var importValue = state.settings.importCode && state.settings.importReady
+      ? state.settings.importCode
+      : (localStatus.enabled ? 'Starting…' : 'TV web server is off');
     row('localServer.importCode', 'Import code',
       'Enter this code and the TV IP in the config server. It works only while Settings is open.',
-      'display', state.settings.importCode || 'Starting…');
+      'display', importValue);
     row('localServer.host', 'TV IP address', 'Optional override if automatic detection fails', 'text',
       bareHost(draft.localServer.host) || 'Automatic');
     row('localServer.token', 'Web access token', 'Enter this in the browser when prompted', 'text',
@@ -2867,6 +2873,8 @@
     state.settings.index = 0;
     state.settings.dirty = false;
     state.settings.importCode = '';
+    state.settings.importReady = false;
+    state.settings.importRetry = 0;
     state.savedLabel = '';
     A.UI.showScreen('settings');
     startImportServer();
@@ -3379,6 +3387,7 @@
     var enabled = Object.prototype.hasOwnProperty.call(options, 'enabled')
       ? options.enabled
       : !!local.enabled;
+    if (enabled) state.localServerToken = token;
     A.LocalServer.configure(enabled, localServerHandlers(), token);
   }
 
@@ -3401,18 +3410,46 @@
   }
 
   function startImportServer() {
-    state.settings.importCode = generateImportCode();
-    A.LocalServer.configure(true, localServerHandlers(), state.settings.importCode);
-    A.LocalServer.push(A.Config.get());
+    if (state.screen !== 'settings') return;
+    state.settings.importCode = '';
+    state.settings.importReady = false;
+    var status = A.LocalServer.status();
+    if (!status.enabled) {
+      renderSettingsScreen();
+      return;
+    }
+    if (!status.ready) {
+      if (state.settings.importRetry < 15) {
+        state.settings.importRetry++;
+        setTimeout(startImportServer, 700);
+      }
+      renderSettingsScreen();
+      return;
+    }
+    state.settings.importRetry = 0;
+    var normal = state.localServerToken || ensureLocalToken(cfg());
+    state.localServerToken = normal;
+    var code = generateImportCode();
+    state.settings.importCode = code;
+    A.LocalServer.setToken(code, function () {
+      if (state.settings.importCode !== code) return;
+      state.settings.importReady = true;
+      if (state.screen === 'settings') renderSettingsScreen();
+      A.UI.toast('Import code ready', 'ok', 2200);
+    });
     setTimeout(function () {
-      if (state.screen === 'settings' && state.settings.importCode) renderSettingsScreen();
+      if (state.screen === 'settings' && state.settings.importCode === code && !state.settings.importReady) {
+        renderSettingsScreen();
+      }
     }, 1200);
   }
 
   function stopImportServer() {
     if (!state.settings.importCode) return;
+    var normal = state.localServerToken || ensureLocalToken(cfg());
     state.settings.importCode = '';
-    configureLocalServer(cfg(), { force: true });
+    state.settings.importReady = false;
+    if (A.LocalServer.status().enabled) A.LocalServer.setToken(normal);
   }
 
   function applyConfig(options) {

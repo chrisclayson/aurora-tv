@@ -89,15 +89,18 @@ The web UI's **TV guide** card shows the direct `/epg.xml` URL and has a
    IP address plus the six-character code.
 3. The TV's profile is read from port 8099 and stored in the add-on.
 
-The temporary import server runs only while Settings is open. Its random
-six-character code is regenerated whenever it starts, is sent in the
-`X-Aurora-Token` header, and stops working when Settings closes or the app is
-backgrounded. An existing profile with the same device ID is replaced.
+The import code is created fresh each time Settings opens. Settings rotates the
+on-TV server's access token to that code in place, so port 8099 is never
+restarted. Closing Settings or backgrounding Aurora restores the normal token,
+which invalidates the code. An existing profile with the same device ID is
+replaced.
 
 The add-on first checks `http://<TV-IP>:8099/api/health` and then reads the
-profile. If the health check times out, the TV is not routable from the HA host
-on port 8099 — check the TV IP, VLAN/routing rules and firewall. The on-TV
-server itself has no subnet restriction and listens on all interfaces.
+profile over a fresh `Connection: close` socket. If the health check times out,
+the TV is not routable from the HA host on port 8099 — check the TV IP,
+VLAN/routing rules and firewall. The on-TV server itself has no subnet
+restriction and listens on all interfaces. A stale connection can no longer
+wedge it: the server drops idle sockets after 750 ms.
 
 ## TVs
 

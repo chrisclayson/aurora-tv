@@ -472,8 +472,11 @@ desktops. It only exposes the TV's own single profile (no multi-device sidebar).
   back.
 - The config server's state lives in the app's `localStorage`: on each app
   start Aurora seeds the WASM server from its saved config.
-- The generated token is random per installation. Rotate it in TV Settings; the
-  server restarts and the browser must use the new token.
+- The generated token is random per installation. Editing it in TV Settings
+  rotates it in place through `POST /api/auth/local`; the server does not
+  restart and the browser must use the new token. Stopping and starting the TV
+  web server asks the worker to close its listening socket first, so port 8099
+  can bind again.
 - No external dependency is required for this mode. The optional
   `config-server/` remains useful for provisioning several TVs, initial
   bootstrap, or when you want a server that runs independently of the TV app.
@@ -535,10 +538,18 @@ To import a TV that already has Aurora configured:
    six-character **Import code**.
 2. In the add-on UI use the **Import a TV** button and enter the TV's IP and the
    six-character code. The code is sent in the `X-Aurora-Token` header.
-3. The code is regenerated each time Settings opens and the temporary import
-   server starts. It stops working as soon as Settings closes or the app is
-   backgrounded. Live profiles and local deployment notes
-are git-ignored, so Home Assistant tokens never enter the repository. Point
+3. Settings rotates the on-TV server's access token to the displayed code, so
+   no restart is needed and port 8099 stays up. Closing Settings (or
+   backgrounding Aurora) restores the normal token and the code stops working.
+   A fresh code is generated every time Settings opens.
+
+The on-TV server is a single WebAssembly worker. It now drops idle sockets
+after a short wait, and the add-on opens a fresh `Connection: close` socket for
+each TV request, so a browser preconnect or a half-open import can no longer
+make port 8099 stop responding.
+
+Live profiles and local deployment notes are git-ignored, so Home Assistant
+tokens never enter the repository. Point
 each TV's remote configuration at the add-on:
 
 ```text
