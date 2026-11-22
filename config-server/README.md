@@ -83,15 +83,16 @@ The web UI's **TV guide** card shows the direct `/epg.xml` URL and has a
 
 ## Import an existing TV
 
-1. On the TV open **Settings → On-TV web configuration → Import from TV** and
-   choose **Enable**.
+1. On the TV open **Settings → On-TV web configuration** and read the
+   six-character **Import code**.
 2. In the add-on UI open the **↓** button beside **Devices** and enter the TV's
-   IP address.
+   IP address plus the six-character code.
 3. The TV's profile is read from port 8099 and stored in the add-on.
 
-Import mode temporarily removes token protection from the on-TV port 8099 and
-turns itself off when Settings is closed, when the app is backgrounded, or after
-five minutes. An existing profile with the same device ID is replaced.
+The temporary import server runs only while Settings is open. Its random
+six-character code is regenerated whenever it starts, is sent in the
+`X-Aurora-Token` header, and stops working when Settings closes or the app is
+backgrounded. An existing profile with the same device ID is replaced.
 
 The add-on first checks `http://<TV-IP>:8099/api/health` and then reads the
 profile. If the health check times out, the TV is not routable from the HA host

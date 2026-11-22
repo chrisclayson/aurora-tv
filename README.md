@@ -531,12 +531,13 @@ create one profile per TV in the UI.
 
 To import a TV that already has Aurora configured:
 
-1. On the TV open **Settings → On-TV web configuration → Import from TV** and
-   choose **Enable**.
-2. In the add-on UI use the **Import a TV** button and enter the TV's IP.
-3. Import mode turns off when Settings closes, when the app is backgrounded, or
-   after five minutes. It temporarily makes TV port 8099 tokenless so the
-   add-on can read the profile. Live profiles and local deployment notes
+1. On the TV open **Settings → On-TV web configuration** and read the
+   six-character **Import code**.
+2. In the add-on UI use the **Import a TV** button and enter the TV's IP and the
+   six-character code. The code is sent in the `X-Aurora-Token` header.
+3. The code is regenerated each time Settings opens and the temporary import
+   server starts. It stops working as soon as Settings closes or the app is
+   backgrounded. Live profiles and local deployment notes
 are git-ignored, so Home Assistant tokens never enter the repository. Point
 each TV's remote configuration at the add-on:
 

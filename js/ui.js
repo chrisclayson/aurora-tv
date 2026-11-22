@@ -600,6 +600,11 @@
         valueHtml = '<span class="toggle ' + (row.value ? 'on' : '') + '"><span></span></span>';
       } else if (row.kind === 'action') {
         valueHtml = '<span class="setting-action">' + U.esc(row.actionLabel || 'Open') + '</span>';
+      } else if (row.kind === 'display') {
+        var codeText = String(row.value == null ? '' : row.value);
+        valueHtml = '<span class="setting-code">' +
+          codeText.split('').map(function (ch) { return '<b>' + U.esc(ch) + '</b>'; }).join('') +
+          '</span>';
       } else {
         valueHtml = '<span class="setting-text' + (row.muted ? ' muted' : '') + '">' + U.esc(row.value == null ? '' : row.value) + '</span>' +
           '<span class="setting-chevron">' + icon('chevron') + '</span>';

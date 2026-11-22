@@ -788,3 +788,33 @@ code {
 
 .side-head-actions { display: inline-flex; align-items: center; gap: 6px; }
 .empty-actions { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
+/* Six-character TV import code */
+.mfa-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.mfa-input input {
+  width: 42px;
+  height: 52px;
+  padding: 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(4, 6, 12, 0.55);
+  color: var(--ink);
+  outline: none;
+}
+.mfa-input input:focus {
+  border-color: rgba(122, 162, 255, 0.75);
+  box-shadow: 0 0 0 3px rgba(122, 162, 255, 0.13);
+}
+@media (max-width: 520px) {
+  .mfa-input { gap: 5px; }
+  .mfa-input input { width: 34px; height: 44px; font-size: 19px; }
+}

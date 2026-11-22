@@ -98,13 +98,23 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
       <h2 id="import-title">Import a TV</h2>
       <p class="modal-copy">
-        On the TV open <b>Settings → On-TV web configuration → Import from TV</b>
-        and choose <b>Enable</b>. Import mode ends automatically when Settings is
-        closed. Then enter the TV's IP address here.
+        On the TV open <b>Settings → On-TV web configuration</b> and read the
+        six-character import code. The code only works while Settings is open.
       </p>
       <label class="field">
         <span>TV IP address</span>
         <input id="import-ip" type="text" placeholder="192.168.50.143" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Import code</span>
+        <div class="mfa-input" id="import-code-inputs">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="one-time-code" spellcheck="false" aria-label="Import code character 1">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Import code character 2">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Import code character 3">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Import code character 4">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Import code character 5">
+          <input type="text" maxlength="1" inputmode="text" autocomplete="off" spellcheck="false" aria-label="Import code character 6">
+        </div>
         <small>Aurora reads the existing profile from port 8099. An existing profile with the same device ID is replaced.</small>
       </label>
       <p class="form-error" id="import-error" hidden></p>

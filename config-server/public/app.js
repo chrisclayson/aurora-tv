@@ -61,6 +61,9 @@
   var newError = document.getElementById('new-error');
   var importModal = document.getElementById('import-modal');
   var importError = document.getElementById('import-error');
+  var importCodeInputs = Array.prototype.slice.call(
+    document.querySelectorAll('#import-code-inputs input')
+  );
 
   /* ---------- utilities ---------- */
 
@@ -852,10 +855,22 @@
     setTimeout(function () { document.getElementById('new-id').focus(); }, 50);
   }
 
+  function setImportCode(value) {
+    var chars = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6).split('');
+    importCodeInputs.forEach(function (input, index) {
+      input.value = chars[index] || '';
+    });
+  }
+
+  function importCode() {
+    return importCodeInputs.map(function (input) { return input.value; }).join('').toUpperCase();
+  }
+
   function openImportDevice() {
     importError.hidden = true;
     importError.textContent = '';
     document.getElementById('import-ip').value = '';
+    setImportCode('');
     importModal.hidden = false;
     setTimeout(function () { document.getElementById('import-ip').focus(); }, 50);
   }
@@ -869,10 +884,16 @@
     var input = document.getElementById('import-ip');
     var button = document.getElementById('import-save');
     var ip = input.value.trim();
+    var code = importCode();
     importError.hidden = true;
     if (!ip) {
       importError.hidden = false;
       importError.textContent = 'Enter the TV IP address';
+      return;
+    }
+    if (code.length !== 6) {
+      importError.hidden = false;
+      importError.textContent = 'Enter the 6-character import code from the TV';
       return;
     }
     button.disabled = true;
@@ -880,7 +901,7 @@
     try {
       var data = await api('api/import/tv', {
         method: 'POST',
-        body: JSON.stringify({ ip: ip })
+        body: JSON.stringify({ ip: ip, code: code })
       });
       importModal.hidden = true;
       await loadDevices();
@@ -1053,7 +1074,41 @@
     document.getElementById('import-cancel').addEventListener('click', closeImportDevice);
     document.getElementById('import-save').addEventListener('click', importDevice);
     document.getElementById('import-ip').addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') { event.preventDefault(); importDevice(); }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (importCodeInputs[0]) importCodeInputs[0].focus();
+      }
+    });
+    importCodeInputs.forEach(function (input, index) {
+      input.addEventListener('input', function () {
+        input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 1);
+        if (input.value && index < importCodeInputs.length - 1) {
+          importCodeInputs[index + 1].focus();
+        }
+      });
+      input.addEventListener('keydown', function (event) {
+        if (event.key === 'Backspace' && !input.value && index > 0) {
+          event.preventDefault();
+          importCodeInputs[index - 1].focus();
+          importCodeInputs[index - 1].value = '';
+        } else if (event.key === 'ArrowLeft' && index > 0) {
+          event.preventDefault();
+          importCodeInputs[index - 1].focus();
+        } else if (event.key === 'ArrowRight' && index < importCodeInputs.length - 1) {
+          event.preventDefault();
+          importCodeInputs[index + 1].focus();
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          importDevice();
+        }
+      });
+      input.addEventListener('paste', function (event) {
+        event.preventDefault();
+        var paste = (event.clipboardData || window.clipboardData).getData('text');
+        setImportCode(paste);
+        var next = importCodeInputs.findIndex(function (node) { return !node.value; });
+        if (next >= 0) importCodeInputs[next].focus();
+      });
     });
     document.getElementById('token-btn').addEventListener('click', function () { openTokenModal(''); });
 

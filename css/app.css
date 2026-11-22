@@ -1890,6 +1890,30 @@ body.festive .brand-name { color: rgba(255, 226, 170, 0.72); }
 .setting-row.danger .setting-label { color: #fda4af; }
 .setting-row.danger .setting-action { color: #fda4af; background: rgba(251, 113, 133, 0.1); }
 
+.setting-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.setting-code b {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 209, 102, 0.28);
+  background: rgba(255, 209, 102, 0.1);
+  color: #ffe6a8;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+.setting-code b:nth-child(2n) {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
 .setting-action {
   padding: 11px 18px;
   border-radius: 14px;

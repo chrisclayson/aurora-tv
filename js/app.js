@@ -60,8 +60,7 @@
       rows: [],
       actions: [],
       dirty: false,
-      importMode: false,
-      importTimer: null
+      importCode: ''
     },
     savedLabel: '',
     festiveKey: '',
@@ -1216,7 +1215,7 @@
   }
 
   function showHome() {
-    if (state.settings.importMode) disableTvImport(true);
+    if (state.settings.importCode) stopImportServer();
     if (A.HANative) A.HANative.stopLive();
     state.screen = 'home';
     state.backgrounded = false;
@@ -2758,11 +2757,9 @@
     row('localServer.enabled', 'TV web server', 'Port 8099 · ' +
       (localStatus.ready ? 'running' : (localStatus.enabled ? (localStatus.error || 'starting') : 'stopped')),
       'toggle', !!draft.localServer.enabled);
-    row('localServer.import', 'Import from TV',
-      state.settings.importMode
-        ? 'Enabled · ' + (localHost() ? 'http://' + localHost() + ':8099/api/config/local' : 'port 8099')
-        : 'Temporarily open port 8099 without a token (5 min max). Ends when Settings closes.',
-      'action', '', { actionLabel: state.settings.importMode ? 'Disable' : 'Enable' });
+    row('localServer.importCode', 'Import code',
+      'Enter this code and the TV IP in the config server. It works only while Settings is open.',
+      'display', state.settings.importCode || 'Starting…');
     row('localServer.host', 'TV IP address', 'Optional override if automatic detection fails', 'text',
       bareHost(draft.localServer.host) || 'Automatic');
     row('localServer.token', 'Web access token', 'Enter this in the browser when prompted', 'text',
@@ -2869,9 +2866,10 @@
     state.settings.draft = A.Config.clone();
     state.settings.index = 0;
     state.settings.dirty = false;
-    state.settings.importMode = false;
+    state.settings.importCode = '';
     state.savedLabel = '';
     A.UI.showScreen('settings');
+    startImportServer();
     renderSettingsScreen();
     A.Platform.hideLivePreview();
   }
@@ -2879,6 +2877,7 @@
   function activateSetting(index) {
     var row = state.settings.actions[index];
     if (!row) return;
+    if (row.kind === 'display') return;
     var draft = state.settings.draft;
 
     if (row.kind === 'toggle') {
@@ -2904,7 +2903,6 @@
       if (row.id === 'remoteSync') return syncRemoteConfig(true);
       if (row.id === 'localServerInfo') return showLocalServerInfo();
       if (row.id === 'setupQr') return openSetupQR(true);
-      if (row.id === 'localServer.import') return toggleTvImport();
       if (row.id === 'apps.configure') return openAppPicker();
       if (row.id === 'epg.nativeGuideApp') {
         return openAppPicker({ mode: 'select', path: 'epg.nativeGuideAppId', title: 'Native guide app' });
@@ -3059,7 +3057,7 @@
       A.UI.toast('Config URL must start with http:// or https://', 'error', 4200);
       return;
     }
-    if (state.settings.importMode) disableTvImport(true);
+    if (state.settings.importCode) stopImportServer();
     var live = A.Config.get();
     Object.keys(draft).forEach(function (key) { live[key] = draft[key]; });
     A.Config.save();
@@ -3373,7 +3371,7 @@
 
   function configureLocalServer(conf, options) {
     options = options || {};
-    if (state.settings.importMode && !options.force) return;
+    if (state.settings.importCode && !options.force) return;
     var local = conf.localServer || { enabled: true };
     var token = Object.prototype.hasOwnProperty.call(options, 'token')
       ? options.token
@@ -3384,39 +3382,37 @@
     A.LocalServer.configure(enabled, localServerHandlers(), token);
   }
 
-  function enableTvImport() {
-    state.settings.importMode = true;
-    configureLocalServer(cfg(), { force: true, enabled: true, token: '' });
+  function generateImportCode() {
+    var alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    var out = '';
+    var bytes = new Uint8Array(6);
+    var secure = false;
+    try {
+      if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(bytes);
+        secure = true;
+      }
+    } catch (e) { /* fall back */ }
+    for (var i = 0; i < 6; i++) {
+      var n = secure ? bytes[i] : Math.floor(Math.random() * 256);
+      out += alphabet.charAt(n % alphabet.length);
+    }
+    return out;
+  }
+
+  function startImportServer() {
+    state.settings.importCode = generateImportCode();
+    A.LocalServer.configure(true, localServerHandlers(), state.settings.importCode);
     A.LocalServer.push(A.Config.get());
-    clearTimeout(state.settings.importTimer);
-    state.settings.importTimer = setTimeout(function () {
-      if (!state.settings.importMode) return;
-      disableTvImport(true);
-      if (state.screen === 'settings') renderSettingsScreen();
-      A.UI.toast('TV import mode timed out', '', 3000);
-    }, 5 * 60 * 1000);
-    renderSettingsScreen();
-    var ip = localHost() || A.LocalServer.localIP();
-    A.UI.toast(ip ? 'Import enabled for ' + ip + ':8099' : 'Import enabled on port 8099', 'ok', 5000);
     setTimeout(function () {
-      if (state.screen === 'settings' && state.settings.importMode) renderSettingsScreen();
+      if (state.screen === 'settings' && state.settings.importCode) renderSettingsScreen();
     }, 1200);
   }
 
-  function disableTvImport(quiet) {
-    clearTimeout(state.settings.importTimer);
-    state.settings.importTimer = null;
-    state.settings.importMode = false;
+  function stopImportServer() {
+    if (!state.settings.importCode) return;
+    state.settings.importCode = '';
     configureLocalServer(cfg(), { force: true });
-    if (!quiet) {
-      A.UI.toast('TV import mode disabled', '', 2200);
-      if (state.screen === 'settings') renderSettingsScreen();
-    }
-  }
-
-  function toggleTvImport() {
-    if (state.settings.importMode) disableTvImport();
-    else enableTvImport();
   }
 
   function applyConfig(options) {
@@ -3488,7 +3484,7 @@
     });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
-        if (state.settings.importMode) disableTvImport(true);
+        if (state.settings.importCode) stopImportServer();
         setInputBackdrop(false);
         A.Platform.hideLivePreview();
         return;

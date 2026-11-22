@@ -244,6 +244,10 @@ function normalizeTvHost(value) {
 
 async function importTv(body) {
   const host = normalizeTvHost(body && body.ip);
+  const code = String((body && body.code) || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    throw new Error('Enter the 6-character import code shown on the TV');
+  }
   const base = 'http://' + host + ':8099';
 
   // The health endpoint is public. Checking it first distinguishes a routing
@@ -268,13 +272,16 @@ async function importTv(body) {
   let payload;
   try {
     const res = await fetch(base + '/api/config/local', {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'X-Aurora-Token': code
+      },
       cache: 'no-store',
       signal: controller.signal
     });
     if (!res.ok) {
       if (res.status === 401) {
-        throw new Error('Enable “Import from TV” on the TV first (Settings → On-TV web configuration)');
+        throw new Error('The import code is wrong or Settings has closed on the TV');
       }
       throw new Error('The TV returned HTTP ' + res.status);
     }
