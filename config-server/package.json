@@ -1,6 +1,6 @@
 {
   "name": "aurora-config-server",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "description": "Web configuration interface and JSON config API for the Aurora Tizen launcher",
   "main": "server.js",

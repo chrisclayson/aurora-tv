@@ -1,5 +1,5 @@
 name: Aurora TV Configuration
-version: "1.3.0"
+version: "1.3.1"
 slug: aurora_config
 description: Central Aurora TV configuration and UK Freeview XMLTV guide
 url: https://github.com/chrisclayson/aurora-tv
@@ -15,10 +15,9 @@ ingress_port: 8090
 panel_icon: mdi:television-guide
 panel_title: Aurora TV
 webui: "http://[HOST]:[PORT:8090]/"
-ports:
-  "8090/tcp": 8090
-ports_description:
-  "8090/tcp": Aurora UI, TV config API and the /epg.xml Freeview guide
+# Share the Home Assistant host network so the add-on can reach TVs on other
+# VLANs/subnets and publish 8090 directly on the HA host.
+host_network: true
 options:
   config_token: ""
   public_url: ""

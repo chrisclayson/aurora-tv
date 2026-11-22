@@ -42,6 +42,10 @@ packages. It supports `aarch64`, `armv7` and `amd64`, so it builds on Raspberry
 Pi OS 64-bit and 32-bit Home Assistant installations. No prebuilt image or
 separate build server is required.
 
+The add-on uses `host_network: true`, so it shares the Home Assistant host's
+network. This lets it reach TVs on other VLANs/subnets when the HA host can
+route to them.
+
 ### Local add-on alternative
 
 If you prefer not to add the Git repository, copy the `config-server/` folder to
@@ -88,6 +92,11 @@ The web UI's **TV guide** card shows the direct `/epg.xml` URL and has a
 Import mode temporarily removes token protection from the on-TV port 8099 and
 turns itself off when Settings is closed, when the app is backgrounded, or after
 five minutes. An existing profile with the same device ID is replaced.
+
+The add-on first checks `http://<TV-IP>:8099/api/health` and then reads the
+profile. If the health check times out, the TV is not routable from the HA host
+on port 8099 — check the TV IP, VLAN/routing rules and firewall. The on-TV
+server itself has no subnet restriction and listens on all interfaces.
 
 ## TVs
 

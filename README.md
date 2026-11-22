@@ -519,6 +519,9 @@ and installs Node.js from Alpine packages. It supports **aarch64, armv7 and
 amd64**, including 32-bit and 64-bit Raspberry Pi Home Assistant installations.
 No prebuilt image or separate build server is needed.
 
+It runs with `host_network: true`, sharing the Home Assistant host network so it
+can reach TVs on other VLANs/subnets when the host has a route to them.
+
 A local install is still possible by copying `config-server/` to
 `/addons/aurora_config/` and installing it as a local add-on.
 

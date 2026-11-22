@@ -244,11 +244,30 @@ function normalizeTvHost(value) {
 
 async function importTv(body) {
   const host = normalizeTvHost(body && body.ip);
+  const base = 'http://' + host + ':8099';
+
+  // The health endpoint is public. Checking it first distinguishes a routing
+  // or firewall problem from import mode not being enabled on the TV.
+  const healthController = new AbortController();
+  const healthTimer = setTimeout(function () { healthController.abort(); }, 6000);
+  try {
+    const health = await fetch(base + '/api/health', {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: healthController.signal
+    });
+    if (!health.ok) throw new Error('HTTP ' + health.status);
+  } catch (err) {
+    throw new Error('Cannot reach the TV at ' + host + ':8099. Check that the TV and Home Assistant can route to each other (including across VLANs/subnets) and that port 8099 is not blocked.');
+  } finally {
+    clearTimeout(healthTimer);
+  }
+
   const controller = new AbortController();
-  const timer = setTimeout(function () { controller.abort(); }, 10000);
+  const timer = setTimeout(function () { controller.abort(); }, 20000);
   let payload;
   try {
-    const res = await fetch('http://' + host + ':8099/api/config/local', {
+    const res = await fetch(base + '/api/config/local', {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
       signal: controller.signal
@@ -261,7 +280,7 @@ async function importTv(body) {
     }
     payload = await res.json();
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Timed out contacting the TV at ' + host);
+    if (err.name === 'AbortError') throw new Error('The TV answered health checks but timed out reading its profile; wait a moment and try again.');
     throw err;
   } finally {
     clearTimeout(timer);
