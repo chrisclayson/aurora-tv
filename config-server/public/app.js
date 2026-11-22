@@ -59,6 +59,8 @@
   var tokenError = document.getElementById('token-error');
   var deviceModal = document.getElementById('device-modal');
   var newError = document.getElementById('new-error');
+  var importModal = document.getElementById('import-modal');
+  var importError = document.getElementById('import-error');
 
   /* ---------- utilities ---------- */
 
@@ -850,6 +852,51 @@
     setTimeout(function () { document.getElementById('new-id').focus(); }, 50);
   }
 
+  function openImportDevice() {
+    importError.hidden = true;
+    importError.textContent = '';
+    document.getElementById('import-ip').value = '';
+    importModal.hidden = false;
+    setTimeout(function () { document.getElementById('import-ip').focus(); }, 50);
+  }
+
+  function closeImportDevice() {
+    importModal.hidden = true;
+    importError.hidden = true;
+  }
+
+  async function importDevice() {
+    var input = document.getElementById('import-ip');
+    var button = document.getElementById('import-save');
+    var ip = input.value.trim();
+    importError.hidden = true;
+    if (!ip) {
+      importError.hidden = false;
+      importError.textContent = 'Enter the TV IP address';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Importing…';
+    try {
+      var data = await api('api/import/tv', {
+        method: 'POST',
+        body: JSON.stringify({ ip: ip })
+      });
+      importModal.hidden = true;
+      await loadDevices();
+      await loadConfig(data.device.id);
+      toast(data.replaced ? 'Imported and updated ' + data.device.name : 'Imported ' + data.device.name, 'ok');
+    } catch (err) {
+      if (!err.unauthorised) {
+        importError.hidden = false;
+        importError.textContent = err.message;
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Import TV';
+    }
+  }
+
   async function createDevice() {
     var id = slug(document.getElementById('new-id').value);
     var name = document.getElementById('new-name').value.trim() || id;
@@ -1001,6 +1048,13 @@
     document.getElementById('download-config').addEventListener('click', downloadConfig);
     document.getElementById('add-device').addEventListener('click', openNewDevice);
     document.getElementById('empty-add').addEventListener('click', openNewDevice);
+    document.getElementById('import-device').addEventListener('click', openImportDevice);
+    document.getElementById('empty-import').addEventListener('click', openImportDevice);
+    document.getElementById('import-cancel').addEventListener('click', closeImportDevice);
+    document.getElementById('import-save').addEventListener('click', importDevice);
+    document.getElementById('import-ip').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') { event.preventDefault(); importDevice(); }
+    });
     document.getElementById('token-btn').addEventListener('click', function () { openTokenModal(''); });
 
     deviceList.addEventListener('click', function (event) {
@@ -1028,6 +1082,7 @@
       if (event.key === 'Escape') {
         if (!tokenModal.hidden) closeTokenModal();
         if (!deviceModal.hidden) deviceModal.hidden = true;
+        if (importModal && !importModal.hidden) closeImportDevice();
       }
     });
 

@@ -524,7 +524,16 @@ A local install is still possible by copying `config-server/` to
 
 Profiles are stored in `/data/aurora/` inside the add-on container and survive
 updates. An example profile is included in `config-server/data/example.json`;
-create one profile per TV in the UI. Live profiles and local deployment notes
+create one profile per TV in the UI.
+
+To import a TV that already has Aurora configured:
+
+1. On the TV open **Settings → On-TV web configuration → Import from TV** and
+   choose **Enable**.
+2. In the add-on UI use the **Import a TV** button and enter the TV's IP.
+3. Import mode turns off when Settings closes, when the app is backgrounded, or
+   after five minutes. It temporarily makes TV port 8099 tokenless so the
+   add-on can read the profile. Live profiles and local deployment notes
 are git-ignored, so Home Assistant tokens never enter the repository. Point
 each TV's remote configuration at the add-on:
 
@@ -608,6 +617,7 @@ All endpoints except `/api/health` require the token as
 | `POST` | `/api/ha/entities` | `{baseUrl,token}` → entity names, states and device classes for the picker |
 | `POST` | `/api/test/xmltv` | `{url}` |
 | `GET` | `/epg.xml` | Public UK Freeview XMLTV with `<lcn>` numbers |
+| `POST` | `/api/import/tv` | Import an existing TV profile by IP |
 | `GET` | `/api/health` | Unauthenticated liveness check |
 
 The TV request is a simple cross-origin GET; the server answers CORS preflight

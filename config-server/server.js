@@ -228,6 +228,63 @@ async function fetchHaEntities(body) {
   }
 }
 
+function normalizeTvHost(value) {
+  let text = String(value || '').trim();
+  text = text.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/.*$/, '');
+  if (text.charAt(0) === '[' && text.indexOf(']') !== -1) {
+    text = text.slice(1, text.indexOf(']'));
+  } else {
+    text = text.replace(/:\d+$/, '');
+  }
+  if (!/^[a-z0-9][a-z0-9.-]{0,253}$/i.test(text)) {
+    throw new Error('Enter the TV IP address or hostname');
+  }
+  return text;
+}
+
+async function importTv(body) {
+  const host = normalizeTvHost(body && body.ip);
+  const controller = new AbortController();
+  const timer = setTimeout(function () { controller.abort(); }, 10000);
+  let payload;
+  try {
+    const res = await fetch('http://' + host + ':8099/api/config/local', {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Enable “Import from TV” on the TV first (Settings → On-TV web configuration)');
+      }
+      throw new Error('The TV returned HTTP ' + res.status);
+    }
+    payload = await res.json();
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Timed out contacting the TV at ' + host);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+  const config = payload && payload.config ? payload.config : payload;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw new Error('The TV did not return an Aurora configuration');
+  }
+  if (!config.deviceId && !config.deviceName && !config.ha && !config.sources) {
+    throw new Error('The TV has not exported its profile yet; wait a moment and try again');
+  }
+  let id = String(config.deviceId || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 41);
+  if (!DEVICE_ID.test(id)) {
+    id = 'tv-' + host.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+  }
+  config.deviceId = id;
+  config.deviceName = String(config.deviceName || ('TV ' + host)).trim() || ('TV ' + host);
+  const existed = fs.existsSync(configFile(id));
+  writeConfig(id, config);
+  log('imported device', id, 'from', host, existed ? '(replaced)' : '');
+  return { ok: true, device: deviceSummary(id), config: config, replaced: existed, host: host };
+}
+
 async function testXmltv(body) {
   const url = String(body.url || '').trim();
   if (!/^https?:\/\//i.test(url)) throw new Error('XMLTV URL must start with http:// or https://');
@@ -359,6 +416,15 @@ const server = http.createServer(async function (req, res) {
       writeConfig(id, cfg);
       log('created device', id, 'from', copyFrom);
       return json(res, 201, { device: deviceSummary(id), config: cfg });
+    }
+
+    if (url.pathname === '/api/import/tv' && req.method === 'POST') {
+      const body = parseJson(await readBody(req)) || {};
+      try {
+        return json(res, 200, await importTv(body));
+      } catch (err) {
+        return json(res, 400, { error: err.name === 'AbortError' ? 'Timed out contacting the TV' : err.message });
+      }
     }
 
     const deleteMatch = url.pathname.match(/^\/api\/devices\/([a-z0-9_-]+)$/);

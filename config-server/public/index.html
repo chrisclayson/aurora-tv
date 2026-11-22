@@ -29,7 +29,10 @@
     <aside class="sidebar">
       <div class="side-head">
         <span>Devices</span>
-        <button class="icon-btn" id="add-device" type="button" title="Add device" aria-label="Add device">+</button>
+        <span class="side-head-actions">
+          <button class="icon-btn" id="import-device" type="button" title="Import a TV by IP" aria-label="Import a TV by IP">↓</button>
+          <button class="icon-btn" id="add-device" type="button" title="Add device" aria-label="Add device">+</button>
+        </span>
       </div>
       <div id="device-list" class="device-list"></div>
       <div class="side-note">
@@ -60,8 +63,11 @@
 
       <div class="empty" id="empty" hidden>
         <h2>No devices yet</h2>
-        <p>Add a device to create its configuration.</p>
-        <button class="btn primary" id="empty-add" type="button">Add device</button>
+        <p>Add a device or import an existing TV by its IP address.</p>
+        <div class="empty-actions">
+          <button class="btn primary" id="empty-add" type="button">Add device</button>
+          <button class="btn ghost" id="empty-import" type="button">Import a TV</button>
+        </div>
       </div>
     </main>
   </div>
@@ -84,6 +90,27 @@
       <div class="modal-actions">
         <button class="btn ghost" id="token-cancel" type="button">Cancel</button>
         <button class="btn primary" id="token-save" type="button">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="import-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <h2 id="import-title">Import a TV</h2>
+      <p class="modal-copy">
+        On the TV open <b>Settings → On-TV web configuration → Import from TV</b>
+        and choose <b>Enable</b>. Import mode ends automatically when Settings is
+        closed. Then enter the TV's IP address here.
+      </p>
+      <label class="field">
+        <span>TV IP address</span>
+        <input id="import-ip" type="text" placeholder="192.168.50.143" autocomplete="off" spellcheck="false">
+        <small>Aurora reads the existing profile from port 8099. An existing profile with the same device ID is replaced.</small>
+      </label>
+      <p class="form-error" id="import-error" hidden></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="import-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="import-save" type="button">Import TV</button>
       </div>
     </div>
   </div>

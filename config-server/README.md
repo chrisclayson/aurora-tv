@@ -55,6 +55,7 @@ If you prefer not to add the Git repository, copy the `config-server/` folder to
 | `http://homeassistant.local:8090/` | Configuration UI |
 | `http://homeassistant.local:8090/api/config/<device-id>` | Per-TV profile |
 | `http://homeassistant.local:8090/epg.xml` | UK Freeview XMLTV with `<lcn>` numbers |
+| `POST /api/import/tv` | Import an existing TV by IP |
 | `http://homeassistant.local:8090/api/health` | Liveness check |
 
 The EPG feed is public (no bearer token) so TVs can load it as a normal XMLTV
@@ -75,6 +76,18 @@ The add-on refreshes the guide once an hour by default:
 
 The web UI's **TV guide** card shows the direct `/epg.xml` URL and has a
 **Refresh add-on guide** button.
+
+## Import an existing TV
+
+1. On the TV open **Settings → On-TV web configuration → Import from TV** and
+   choose **Enable**.
+2. In the add-on UI open the **↓** button beside **Devices** and enter the TV's
+   IP address.
+3. The TV's profile is read from port 8099 and stored in the add-on.
+
+Import mode temporarily removes token protection from the on-TV port 8099 and
+turns itself off when Settings is closed, when the app is backgrounded, or after
+five minutes. An existing profile with the same device ID is replaced.
 
 ## TVs
 

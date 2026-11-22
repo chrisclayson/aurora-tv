@@ -785,3 +785,6 @@ code {
 }
 .field-reset:hover { color: #9db8ff; }
 .field-reset-wrap { display: flex; align-items: center; gap: 10px; flex: none; }
+
+.side-head-actions { display: inline-flex; align-items: center; gap: 6px; }
+.empty-actions { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
