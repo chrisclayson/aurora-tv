@@ -1,6 +1,6 @@
 {
   "name": "aurora-tv",
-  "version": "2.5.4",
+  "version": "2.5.5",
   "private": true,
   "description": "Apple TV inspired Tizen launcher with HDMI, Live TV, XMLTV and Home Assistant",
   "scripts": {

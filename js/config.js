@@ -52,7 +52,10 @@
       lastExternal: 'livetv',
       dashboardDuration: 30,
       overlayTimeoutMs: 3500,
-      festiveMode: 'auto'
+      festiveMode: 'auto',
+      navSounds: true,
+      showArtMode: true,
+      showSamsungHub: true
     },
     remoteConfig: {
       enabled: false,
@@ -156,6 +159,9 @@
     }).filter(Boolean).slice(0, 40);
     cfg.ui.dashboardDuration = Math.max(5, Math.min(3600, Number(cfg.ui.dashboardDuration) || 30));
     if (['auto', 'on', 'off'].indexOf(cfg.ui.festiveMode) === -1) cfg.ui.festiveMode = 'auto';
+    cfg.ui.navSounds = cfg.ui.navSounds !== false;
+    cfg.ui.showArtMode = cfg.ui.showArtMode !== false;
+    cfg.ui.showSamsungHub = cfg.ui.showSamsungHub !== false;
     cfg.ui.overlayTimeoutMs = Math.max(1500, Math.min(15000, Number(cfg.ui.overlayTimeoutMs) || 3500));
     if (!cfg.sources[cfg.ui.lastExternal]) cfg.ui.lastExternal = 'livetv';
     // Older seeds used non-existent input app IDs. HDMI uses the native

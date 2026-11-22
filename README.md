@@ -39,9 +39,10 @@ one app is configured.
   lets you configure the app from any browser on the LAN — no separate server.
 - **First-run setup QR**: the TV shows a scannable URL with the access token
   already embedded; the browser page opens pre-authenticated.
-- **Samsung Hub tile**: launches the TV's native Samsung Hub app (`com.samsung.tv.csfs`).
+- **Samsung Hub tile**: launches the TV's native Samsung Hub app (`com.samsung.tv.csfs`). Hide it with `ui.showSamsungHub`.
 - **TV Settings tile**: opens the TV's native picture, sound and network menu.
-- **Art Mode tile**: on supported The Frame models, opens the TV's native Art Mode app.
+- **Art Mode tile**: on supported The Frame models, opens the TV's native Art Mode app. Hide it with `ui.showArtMode`.
+- **Navigation sounds**: a soft Apple TV-style tick as focus moves between tiles, sensors, apps, guide rows, notifications and Settings rows. Toggle with `ui.navSounds`.
 - **Festive mode**: a green, red and gold seasonal theme from 1 December to
   6 January, with fairy lights, a Santa hat, a Christmas countdown and an
   On/Off override in Settings for previewing.
@@ -400,7 +401,10 @@ Example seed:
   "ui": {
     "lastExternal": "hdmi2",
     "overlayTimeoutMs": 3500,
-    "festiveMode": "auto"
+    "festiveMode": "auto",
+    "navSounds": true,
+    "showArtMode": true,
+    "showSamsungHub": true
   },
   "remoteConfig": {
     "enabled": false,
@@ -855,6 +859,9 @@ Aurora detects support from the TV model reported by `tizen.systeminfo`, with
 the configured `model` as a fallback. Launching uses the standard Tizen
 application API, so it works without any extra partner privileges.
 
+Set `ui.showArtMode` to `false` to hide the tile, or use the **Art Mode tile**
+toggle in **Settings → Appearance** / the web configuration Appearance card.
+
 ---
 
 ## Festive mode
@@ -884,6 +891,20 @@ Set `ui.festiveMode` to:
 Change it in **Settings → Appearance → Festive mode**, or in the **Appearance**
 card of either web configuration UI. The setting is checked again at midnight,
 so a long-running app updates itself.
+
+Tile accents are reassigned after tiles are hidden, using the colour that is
+actually rendered in the current theme. This prevents two identical colours
+appearing next to each other in normal or festive mode.
+
+---
+
+## Navigation sounds
+
+Aurora plays a short, low-volume tick when focus moves between selectable
+items. The Web Audio context is created on the first key press, so it works
+with the TV's autoplay policy. Turn it off with **Settings → Appearance →
+Navigation sounds**, the matching toggle in either web configuration UI, or
+`ui.navSounds` in the profile.
 
 ---
 

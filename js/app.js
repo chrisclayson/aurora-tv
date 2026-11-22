@@ -79,6 +79,42 @@
   };
 
   var ACCENTS = ['blue', 'violet', 'teal', 'orange'];
+  var ACCENT_PALETTE = ['blue', 'violet', 'teal', 'orange', 'red', 'indigo', 'amber', 'slate'];
+  /* Several accents share a colour in the festive theme. Use the rendered
+     family, not the class name, when keeping neighbours distinct. */
+  var FESTIVE_ACCENT_FAMILY = {
+    blue: 'green', violet: 'green', indigo: 'green',
+    teal: 'teal', red: 'red', amber: 'gold', slate: 'slate', orange: 'orange'
+  };
+
+  function navSound() {
+    if (A.Sound && typeof A.Sound.tick === 'function') A.Sound.tick();
+  }
+
+  function accentFamily(accent, festive) {
+    return festive ? (FESTIVE_ACCENT_FAMILY[accent] || accent) : accent;
+  }
+
+  /* Hidden tiles can leave two identical colours next to each other. Walk the
+     final visible list and change the second accent when that happens. */
+  function balanceTileAccents(tiles) {
+    var festive = document.body.classList.contains('festive') || festiveActive();
+    var previous = '';
+    tiles.forEach(function (tile) {
+      var accent = tile.accent || 'blue';
+      if (accentFamily(accent, festive) === previous) {
+        for (var i = 0; i < ACCENT_PALETTE.length; i++) {
+          var candidate = ACCENT_PALETTE[i];
+          if (accentFamily(candidate, festive) !== previous) {
+            accent = candidate;
+            break;
+          }
+        }
+      }
+      tile.accent = accent;
+      previous = accentFamily(accent, festive);
+    });
+  }
   var refreshChannelSoon = U.throttle(function () { refreshChannel(); }, 1500);
 
   /* ---------- small helpers ---------- */
@@ -479,16 +515,18 @@
       accent: 'slate'
     });
 
-    tiles.push({
-      id: 'samsunghub',
-      kind: 'SAMSUNG',
-      label: 'Samsung Hub',
-      sub: 'Apps, sources and TV',
-      icon: 'dashboard',
-      accent: 'indigo'
-    });
+    if (conf.ui.showSamsungHub !== false) {
+      tiles.push({
+        id: 'samsunghub',
+        kind: 'SAMSUNG',
+        label: 'Samsung Hub',
+        sub: 'Apps, sources and TV',
+        icon: 'dashboard',
+        accent: 'indigo'
+      });
+    }
 
-    if (artModeAvailable()) {
+    if (artModeAvailable() && conf.ui.showArtMode !== false) {
       tiles.push({
         id: 'artmode',
         kind: 'FRAME',
@@ -508,6 +546,7 @@
       accent: 'teal'
     });
 
+    balanceTileAccents(tiles);
     return tiles;
   }
 
@@ -682,6 +721,7 @@
     var key = now.toDateString() + '|' + festiveMode();
     if (!force && state.festiveKey === key) return festiveActive(now);
     state.festiveKey = key;
+    var wasFestive = document.body.classList.contains('festive');
     var active = festiveActive(now);
     document.body.classList.toggle('festive', active);
     var layer = q('#festive-layer');
@@ -694,6 +734,9 @@
     }
     updateFestiveChrome();
     if (active && !quiet && state.screen === 'home') updateHomeChrome();
+    if (wasFestive !== active && state.screen === 'home' && state.tiles && state.tiles.length) {
+      renderHome();
+    }
     return active;
   }
 
@@ -883,6 +926,7 @@
       onHover: function (index) { state.sensorIndex = index; }
     });
     A.UI.applySensorFocus(state.sensorIndex, true);
+    navSound();
   }
 
   function cancelSensorPress() {
@@ -981,6 +1025,7 @@
     state.focusTileId = state.tiles[state.tileIndex].id;
     A.UI.applyFocus(state.focusTileId, true);
     updateHomeChrome();
+    navSound();
   }
 
   function moveApp(delta) {
@@ -990,6 +1035,7 @@
     state.apps.focusId = apps[state.apps.index].id;
     state.homeRegion = 'apps';
     A.UI.applyFocus(state.apps.focusId, true, 'app');
+    navSound();
   }
 
   function openAppsRow() {
@@ -1150,11 +1196,13 @@
     if (code === 40) {
       state.notifications.index = U.clamp(state.notifications.index + 1, 0, list.length);
       renderNotifications();
+      navSound();
       return true;
     }
     if (code === 38) {
       state.notifications.index = U.clamp(state.notifications.index - 1, 0, list.length);
       renderNotifications();
+      navSound();
       return true;
     }
     if (code === 13) {
@@ -1535,6 +1583,7 @@
     if (dx !== 0 && list.length) {
       guide.programIndex = U.clamp(guide.programIndex + dx, 0, list.length - 1);
       renderGuideScreen();
+      navSound();
       return;
     }
 
@@ -1549,6 +1598,7 @@
       }
       guide.programIndex = nextList.length ? found : 0;
       renderGuideScreen();
+      navSound();
     }
   }
 
@@ -2753,6 +2803,17 @@
       'Automatic from 1 December to 6 January · choose On to preview',
       'cycle', festiveLabels[draft.ui.festiveMode] || 'Automatic',
       { cycleValues: ['auto', 'on', 'off'] });
+    row('ui.navSounds', 'Navigation sounds',
+      'Play a soft tick when moving between items',
+      'toggle', draft.ui.navSounds !== false);
+    row('ui.showSamsungHub', 'Samsung Hub tile',
+      'Show the Samsung Hub shortcut on the home screen',
+      'toggle', draft.ui.showSamsungHub !== false);
+    if (artModeAvailable()) {
+      row('ui.showArtMode', 'Art Mode tile',
+        'Show the Art Mode shortcut on this Frame TV',
+        'toggle', draft.ui.showArtMode !== false);
+    }
 
     add('On-TV web configuration');
     var localStatus = A.LocalServer.status();
@@ -3276,10 +3337,12 @@
       if (code === 38) {
         state.settings.index = U.clamp(state.settings.index - 1, 0, state.settings.actions.length - 1);
         renderSettingsScreen();
+        navSound();
         handled = true;
       } else if (code === 40) {
         state.settings.index = U.clamp(state.settings.index + 1, 0, state.settings.actions.length - 1);
         renderSettingsScreen();
+        navSound();
         handled = true;
       } else if (code === 37 || code === 39) {
         var row = state.settings.actions[state.settings.index];

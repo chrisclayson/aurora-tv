@@ -119,6 +119,11 @@ applies the pushed profile when Settings closes.
 keeps its own remote-sync URL/token and local web-server settings, so pushing
 an old profile cannot stop it polling this add-on or change its access token.
 
+The **Appearance** card also controls the soft navigation sounds, the Samsung
+Hub tile, and the Art Mode tile on Frame TVs. After tiles are hidden, Aurora
+reassigns their accents so two identical colours are never adjacent, including
+in festive mode.
+
 ## TVs
 
 Point each TV's Home Assistant URL at `http://homeassistant.local:8123`, and its

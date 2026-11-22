@@ -22,7 +22,7 @@
       livetv: { label: 'Live TV', sub: 'Antenna / cable', appId: 'org.tizen.tv-viewer', haSource: 'TV' }
     },
     livetv: { guideAppId: '', defaultChannel: '' },
-    ui: { lastExternal: 'livetv', dashboardDuration: 30, overlayTimeoutMs: 3500, festiveMode: 'auto' },
+    ui: { lastExternal: 'livetv', dashboardDuration: 30, overlayTimeoutMs: 3500, festiveMode: 'auto', navSounds: true, showArtMode: true, showSamsungHub: true },
     remoteConfig: { enabled: false, url: '', token: '', pollMinutes: 5 },
     localServer: { enabled: true, token: '', host: '' }
   };
@@ -341,11 +341,13 @@
   }
 
   function toggleField(path, label, hint) {
+    var current = value(path);
+    if (current === undefined) current = getPath(DEFAULTS, path);
     return '<div class="toggle-row"><div class="toggle-copy"><b>' + esc(label) + '</b>' +
       (hint ? '<small>' + esc(hint) + '</small>' : '') + '</div>' +
       '<div class="field-reset-wrap">' + resetControl(path) +
       '<label class="switch"><input type="checkbox" data-path="' + esc(path) + '"' +
-      (value(path) ? ' checked' : '') + '><span class="switch-track"></span></label></div></div>';
+      (current ? ' checked' : '') + '><span class="switch-track"></span></label></div></div>';
   }
 
   function card(titleText, description, body) {
@@ -422,13 +424,18 @@
       inputField('deviceId', 'Device ID', { readonly: true, hint: 'Read-only. Create a new device to change it.' }) +
       '</div>');
 
-    html += card('Appearance', 'Seasonal styling for the home screen.',
+    html += card('Appearance', 'Seasonal styling, sounds and home-screen tiles.',
       '<div class="grid two">' +
       selectField('ui.festiveMode', 'Festive mode', [
         { value: 'auto', label: 'Automatic (1 December – 6 January)' },
         { value: 'on', label: 'On (preview / test)' },
         { value: 'off', label: 'Off' }
       ], 'Automatic enables the festive theme from 1 December to 6 January. Choose On to test it now.') +
+      '</div>' +
+      '<div class="grid" style="margin-top:14px">' +
+      toggleField('ui.navSounds', 'Navigation sounds', 'Play a soft tick when moving between selectable items.') +
+      toggleField('ui.showSamsungHub', 'Samsung Hub tile', 'Show the Samsung Hub shortcut on the home screen.') +
+      toggleField('ui.showArtMode', 'Art Mode tile', 'Show the Art Mode shortcut on Frame TVs.') +
       '</div>');
 
     if (!local) {
@@ -517,6 +524,9 @@
     }
     cfg.ui.overlayTimeoutMs = Math.max(1500, Math.min(15000, Number(cfg.ui.overlayTimeoutMs) || 3500));
     if (['auto', 'on', 'off'].indexOf(cfg.ui.festiveMode) === -1) cfg.ui.festiveMode = 'auto';
+    cfg.ui.navSounds = cfg.ui.navSounds !== false;
+    cfg.ui.showArtMode = cfg.ui.showArtMode !== false;
+    cfg.ui.showSamsungHub = cfg.ui.showSamsungHub !== false;
     cfg.epg.refreshMinutes = Math.max(5, Math.min(1440, Number(cfg.epg.refreshMinutes) || 60));
     cfg.epg.horizonHours = Math.max(1, Math.min(12, Number(cfg.epg.horizonHours) || 3));
     cfg.remoteConfig.pollMinutes = Math.max(1, Math.min(1440, Number(cfg.remoteConfig.pollMinutes) || 5));
